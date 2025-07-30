@@ -419,7 +419,8 @@
                     <td class="p-2">
                         <input type="text" value="${item.descripcion || ''}" data-index="${index}" data-field="descripcion" class="item-input w-full p-1 border rounded">
                         <div class="text-xs text-slate-500 mt-1">
-                            ${item.desc_catalogo || (item.clave_catalogo || 'Sin vincular')}
+                            ${item.desc_catalogo ? `<span>${item.desc_catalogo}</span>` : ''}
+                            ${item.clave_catalogo ? `<span class="copy-clave-btn cursor-pointer underline ml-1" data-clave="${item.clave_catalogo}" title="Copiar clave">${item.clave_catalogo}</span>` : (item.desc_catalogo ? '' : 'Sin vincular')}
                             <button type="button" data-index="${index}" class="search-catalog-btn text-blue-600 text-xs hover:underline ml-2">(buscar)</button>
                         </div>
                     </td>
@@ -842,6 +843,12 @@
         if (e.target.closest('.view-details-btn')) {
             const id = e.target.closest('.view-details-btn').dataset.id;
             showDetails(id);
+        }
+        const copyEl = e.target.closest('.copy-clave-btn');
+        if (copyEl && copyEl.dataset.clave) {
+            navigator.clipboard.writeText(copyEl.dataset.clave).then(() => {
+                showToast('Clave copiada', 'success');
+            });
         }
     });
 
