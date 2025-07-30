@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Compras con IA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .hidden { display: none; }
+        .modal-overlay {
+            transition: opacity 0.3s ease;
+        }
+        .modal-container {
+            transition: transform 0.3s ease;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner { animation: spin 1s linear infinite; }
+        .toast {
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+        /* Estilo para la tabla de items */
+        .item-table th, .item-table td {
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: middle;
+        }
+        .item-table tbody tr:nth-child(odd) {
+            background-color: #f9fafb; /* bg-slate-50 */
+        }
+        .item-table input[type="number"], .item-table input[type="text"] {
+            width: 100%;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1; /* border-slate-300 */
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-6">
+
+        <!-- Encabezado y Botón de Acción Principal -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-900">Gestión de Compras</h1>
+                <p class="text-slate-500 mt-1">Registra y consulta el historial de tus compras con ayuda de IA.</p>
+            </div>
+            <button id="show-register-form-btn" class="mt-4 md:mt-0 w-full md:w-auto bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-transform hover:scale-105 flex items-center justify-center">
+                <span class="material-icons mr-2">add_circle</span>
+                Registrar Nueva Compra
+            </button>
+        </header>
+
+        <!-- Sección de Registro (Inicialmente oculta) -->
+        <div id="register-section" class="hidden bg-white p-6 md:p-8 rounded-2xl shadow-xl mb-8">
+            <!-- El formulario de registro se inyectará aquí -->
+        </div>
+
+        <!-- Sección de Historial de Compras -->
+        <main id="history-section" class="bg-white p-6 md:p-8 rounded-2xl shadow-xl">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4">Historial de Registros</h2>
+            <div id="history-list" class="space-y-4">
+                <!-- Indicador de carga inicial -->
+                <div id="history-loader" class="flex items-center justify-center py-10">
+                    <div class="spinner w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full"></div>
+                    <p class="ml-4 text-slate-500">Cargando registros...</p>
+                </div>
+                <!-- Los registros se insertarán aquí dinámicamente -->
+            </div>
+        </main>
+
+    </div>
+
+    <!-- Modal para ver Detalles de la Compra y Búsqueda de Productos -->
+    <div id="details-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 modal-overlay">
+        <div id="modal-container" class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col modal-container">
+            <header class="flex justify-between items-center p-4 border-b">
+                <h2 id="modal-title" class="text-xl font-bold">Detalles de la Compra</h2>
+                <button id="close-modal-btn" class="text-slate-500 hover:text-slate-800">
+                    <span class="material-icons">close</span>
+                </button>
+            </header>
+            <div id="modal-content" class="p-6 overflow-y-auto">
+                <!-- El contenido del modal se insertará aquí -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Contenedor de Notificaciones (Toast) -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50"></div>
+
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"></script>
+    <script src="/__/firebase/init.js"></script>
+
+<script type="module">
+    // Importaciones de Firebase
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, arrayUnion, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+
+    // --- URL DE TU API DE APPS SCRIPT ---
+    const BIGQUERY_API_URL = 'https://script.google.com/macros/s/AKfycbz-Ix7Mh-ZdmpsJbRaq2ZdcCChHX9TjL2SEi66LhySq9DAoxcSrbEizCQL2QJBQCl1B/exec';
+
+    // --- INICIALIZACIÓN DE FIREBASE ---
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+    const purchasesCollection = collection(db, `artifacts/${appId}/public/data/compras`);
+
+    let userId = null;
+    let extractedItems = [];
+    let totalFacturaAI = 0;
+    let imageUrls = [];
+
+    // --- ELEMENTOS DEL DOM ---
+    const showRegisterFormBtn = document.getElementById('show-register-form-btn');
+    const registerSection = document.getElementById('register-section');
+    const historyList = document.getElementById('history-list');
+    const historyLoader = document.getElementById('history-loader');
+    const detailsModal = document.getElementById('details-modal');
+    const modalContainer = document.getElementById('modal-container');
+    const modalTitle = document.getElementById('modal-title');
+    const closeModalBtn = document.getElementById('close-modal-btn');
+    const modalContent = document.getElementById('modal-content');
+    const toastContainer = document.getElementById('toast-container');
+
+    // --- LÓGICA DE LA APLICACIÓN ---
+
+    function showRegisterForm() {
+        registerSection.innerHTML = getRegisterFormHTML();
+        registerSection.classList.remove('hidden');
+        showRegisterFormBtn.classList.add('hidden');
+        
+        document.getElementById('purchase-form').addEventListener('submit', handleFormSubmit);
+        document.getElementById('file-upload').addEventListener('change', handleFileSelect);
+        document.getElementById('register-section').addEventListener('click', (e) => {
+            if (e.target.id === 'cancel-register-btn') {
+                hideRegisterForm();
+            }
+        });
+    }
+
+    function hideRegisterForm() {
+        registerSection.classList.add('hidden');
+        registerSection.innerHTML = '';
+        showRegisterFormBtn.classList.remove('hidden');
+    }
+
+    function getRegisterFormHTML(data = {}) {
+        return `
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Nuevo Registro</h2>
+                <button id="cancel-register-btn" class="text-slate-500 hover:text-slate-800">Cancelar</button>
+            </div>
+             <div id="step1-upload">
+                 <div class="text-center p-6 border-2 border-dashed border-slate-300 rounded-lg">
+                     <label for="file-upload" class="cursor-pointer text-emerald-600 font-medium">
+                         <span class="material-icons text-4xl">cloud_upload</span><br>
+                         Subir Páginas de la Factura
+                     </label>
+                     <input id="file-upload" type="file" class="hidden" accept="image/*" multiple>
+                     <p class="text-xs text-slate-400 mt-2">Puedes seleccionar varias imágenes a la vez.</p>
+                 </div>
+                 <div id="image-preview-container" class="mt-4 hidden grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+                 <div id="ai-loader" class="hidden flex items-center justify-center bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-lg mt-4">
+                     <div class="spinner w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full mr-3"></div>
+                     <span id="ai-loader-text">Analizando factura con IA...</span>
+                 </div>
+             </div>
+             <form id="purchase-form" class="hidden mt-6">
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div><label for="fecha" class="block text-sm font-medium text-slate-700">Fecha</label><input type="date" id="fecha" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
+                     <div><label for="numero_factura" class="block text-sm font-medium text-slate-700">No. Factura</label><input type="text" id="numero_factura" placeholder="Número de la factura" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
+                     <div><label for="proveedor" class="block text-sm font-medium text-slate-700">Proveedor</label><input type="text" id="proveedor" placeholder="Nombre del proveedor" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
+                     <div><label for="total" class="block text-sm font-medium text-slate-700">Monto Total (Factura)</label><input type="number" id="total" step="0.01" placeholder="0.00" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2 bg-slate-100" readonly></div>
+                     <div><label for="sucursal" class="block text-sm font-medium text-slate-700">Sucursal</label><input type="text" id="sucursal" placeholder="Sucursal que recibe" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
+                     <div><label for="transporte" class="block text-sm font-medium text-slate-700">Transporte</label><input type="text" id="transporte" placeholder="Transporte utilizado" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
+                     <div class="md:col-span-2"><label for="faltantes" class="block text-sm font-medium text-slate-700">Faltantes o Comentarios Adicionales</label><input type="text" id="faltantes" value="Ninguno" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
+                 </div>
+                 <div id="calculation-section" class="mt-8 hidden"></div>
+                 <div class="mt-8 text-right"><button type="submit" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-lg shadow-md">Guardar Registro</button></div>
+             </form>
+         `;
+    }
+    
+    async function handleFileSelect(e) {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        const previewContainer = document.getElementById('image-preview-container');
+        previewContainer.innerHTML = '';
+        previewContainer.classList.remove('hidden');
+        
+        const aiLoader = document.getElementById('ai-loader');
+        const aiLoaderText = document.getElementById('ai-loader-text');
+        aiLoader.classList.remove('hidden');
+        
+        const fileDataPromises = Array.from(files).map(file => {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const base64String = event.target.result;
+                    const imgElement = document.createElement('img');
+                    imgElement.src = base64String;
+                    imgElement.className = 'w-full h-auto object-cover rounded-lg shadow-md';
+                    previewContainer.appendChild(imgElement);
+                    resolve({ base64: base64String, name: file.name, file: file });
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+
+        const fileDataArray = await Promise.all(fileDataPromises);
+        
+        try {
+            aiLoaderText.textContent = `Subiendo ${files.length} imágenes a Storage...`;
+            const uploadPromises = fileDataArray.map(fileData => {
+                const storageRef = ref(storage, `invoices/${userId}/${Date.now()}-${fileData.name}`);
+                return uploadBytes(storageRef, fileData.file).then(snapshot => getDownloadURL(snapshot.ref));
+            });
+            imageUrls = await Promise.all(uploadPromises);
+            
+            aiLoaderText.textContent = 'Analizando factura con IA...';
+            const base64DataForAI = fileDataArray.map(fd => fd.base64.split(',')[1]);
+            const extractedData = await getAIData(base64DataForAI);
+
+            if (extractedData) {
+                document.getElementById('fecha').value = extractedData.fecha || '';
+                document.getElementById('proveedor').value = extractedData.proveedor || '';
+                document.getElementById('total').value = extractedData.total || 0;
+                totalFacturaAI = extractedData.total || 0;
+                
+                // Asegurar que los items tengan las propiedades necesarias
+                extractedItems = (extractedData.items || []).map(item => ({
+                    ...item,
+                    unidades_por_paquete: 1, // Añadido
+                    clave_catalogo: null,
+                    desc_catalogo: null
+                }));
+                showToast('Datos y productos extraídos por la IA.', 'success');
+                displayCalculationUI();
+            } else {
+                showToast('La IA no pudo extraer datos, por favor ingrésalos manualmente.', 'error');
+                displayCalculationUI();
+            }
+        } catch (error) {
+            console.error("Error en el proceso de subida o análisis:", error);
+            showToast('Error al subir imágenes o contactar a la IA.', 'error');
+        } finally {
+            aiLoader.classList.add('hidden');
+            document.getElementById('purchase-form').classList.remove('hidden');
+        }
+    }
+
+    async function getAIData(base64DataArray) {
+        const apiKey = firebaseConfig.apiKey;
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        
+        const parts = [
+            { text: "Analiza las siguientes imágenes que componen una factura de varias páginas. Consolida todos los artículos en una sola lista. El proveedor, fecha y el total final suelen estar en la primera o última página. Responde únicamente con un objeto JSON con las claves 'fecha' (YYYY-MM-DD), 'proveedor', 'total' (número), y 'items' (array de objetos con 'descripcion', 'cantidad' y 'total_linea'). Si un dato no se encuentra, su valor debe ser null o un array vacío para 'items'." }
+        ];
+
+        base64DataArray.forEach(data => {
+            parts.push({ inlineData: { mimeType: "image/jpeg", data: data } });
+        });
+
+        const payload = {
+            contents: [{ role: "user", parts: parts }],
+            generationConfig: { responseMimeType: "application/json" }
+        };
+
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+            const result = await response.json();
+            if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
+                const text = result.candidates[0].content.parts[0].text;
+                return JSON.parse(text);
+            }
+            return null;
+        } catch (error) {
+            console.error("Error al procesar la solicitud a la IA:", error);
+            return null;
+        }
+    }
+    
+    /**
+     * CORREGIDO: IVA por defecto restaurado a 15.
+     */
+    function displayCalculationUI() {
+        const container = document.getElementById('calculation-section');
+        container.classList.remove('hidden');
+        container.innerHTML = `
+            <div class="bg-slate-50 p-6 rounded-lg">
+                <h3 class="text-lg font-bold mb-4">Ajustes y Verificación de Artículos</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div><label for="iva" class="block text-sm font-medium text-slate-700">IVA (%)</label><input type="number" id="iva" value="15" class="recalc-trigger mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
+                    <div><label for="tipo-cambio" class="block text-sm font-medium text-slate-700">Tipo de Cambio</label><input type="number" id="tipo-cambio" value="1" step="0.01" class="recalc-trigger mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
+                </div>
+                <div id="items-table-container" class="overflow-x-auto"></div>
+                <div class="mt-4">
+                    <button type="button" id="add-item-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg flex items-center">
+                        <span class="material-icons mr-2">add</span>Añadir Artículo
+                    </button>
+                </div>
+                <div id="totals-summary" class="mt-6 text-right border-t pt-4"></div>
+            </div>
+        `;
+        
+        renderItemsTable();
+        
+        document.querySelectorAll('.recalc-trigger').forEach(el => el.addEventListener('input', renderItemsTable));
+        document.getElementById('add-item-btn').addEventListener('click', addNewItemRow);
+        
+        const tableContainer = document.getElementById('items-table-container');
+        tableContainer.addEventListener('input', handleTableInput);
+        tableContainer.addEventListener('click', (e) => {
+             if (e.target.closest('.search-catalog-btn')) {
+                openSearchModal(e.target.closest('.search-catalog-btn').dataset.index);
+             }
+        });
+    }
+
+    /**
+     * CORREGIDO: Se añade 'unidades_por_paquete' al crear una nueva fila.
+     */
+    function addNewItemRow() {
+        extractedItems.push({
+            descripcion: '',
+            cantidad: 1,
+            unidades_por_paquete: 1,
+            total_linea: 0, 
+            clave_catalogo: null,
+            desc_catalogo: null
+        });
+        renderItemsTable();
+    }
+
+    /**
+     * CORREGIDO: La lógica de cálculo ahora actualiza el P. Final y Total Línea Final.
+     */
+    function handleTableInput(e) {
+        const input = e.target;
+        if (!input.matches('.item-input')) return;
+
+        const index = parseInt(input.dataset.index);
+        const field = input.dataset.field;
+        const value = input.type === 'number' ? parseFloat(input.value) || 0 : input.value;
+
+        // 1. Actualizar el modelo de datos
+        extractedItems[index][field] = value;
+        
+        // 2. Recalcular la fila y actualizar su UI
+        const ivaPercent = parseFloat(document.getElementById('iva').value) || 0;
+        const tipoCambio = parseFloat(document.getElementById('tipo-cambio').value) || 1;
+        const ivaFactor = 1 + (ivaPercent / 100);
+
+        const item = extractedItems[index];
+        const totalBase = item.total_linea;
+        
+        const totalLineaFinalCalculado = totalBase * ivaFactor * tipoCambio;
+        const cantidadTotalUnidades = item.cantidad * item.unidades_por_paquete;
+        const precioFinalCalculado = cantidadTotalUnidades > 0 ? totalLineaFinalCalculado / cantidadTotalUnidades : 0;
+        
+        const row = input.closest('tr');
+        row.querySelector('.total-linea-final-cell').textContent = `$${totalLineaFinalCalculado.toFixed(2)}`;
+        row.querySelector('.precio-final-cell').textContent = `$${precioFinalCalculado.toFixed(2)}`;
+
+        // 3. Recalcular los totales generales
+        updateGrandTotal();
+    }
+    
+    /**
+     * CORREGIDO: Se restaura la estructura de la tabla con todas las columnas.
+     */
+    function renderItemsTable() {
+        const tableContainer = document.getElementById('items-table-container');
+        const ivaPercent = parseFloat(document.getElementById('iva').value) || 0;
+        const tipoCambio = parseFloat(document.getElementById('tipo-cambio').value) || 1;
+        const ivaFactor = 1 + (ivaPercent / 100);
+
+        let itemsTableHTML = `
+            <table class="w-full text-sm item-table border-collapse">
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left p-2">Descripción</th>
+                        <th class="w-20 text-left p-2">Cant.</th>
+                        <th class="w-20 text-left p-2">UxP</th>
+                        <th class="w-28 text-left p-2">Total Base</th>
+                        <th class="w-28 text-left p-2">P. Final</th>
+                        <th class="w-32 text-left p-2">Total Línea</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        extractedItems.forEach((item, index) => {
+            const totalBase = item.total_linea || 0;
+            const totalLineaFinalCalculado = totalBase * ivaFactor * tipoCambio;
+            const cantidadTotalUnidades = (item.cantidad || 0) * (item.unidades_por_paquete || 0);
+            const precioFinalCalculado = cantidadTotalUnidades > 0 ? totalLineaFinalCalculado / cantidadTotalUnidades : 0;
+            
+            itemsTableHTML += `
+                <tr class="border-b border-slate-200 hover:bg-slate-100">
+                    <td class="p-2">
+                        <input type="text" value="${item.descripcion || ''}" data-index="${index}" data-field="descripcion" class="item-input w-full p-1 border rounded">
+                        <div class="text-xs text-slate-500 mt-1">
+                            ${item.desc_catalogo || (item.clave_catalogo || 'Sin vincular')}
+                            <button type="button" data-index="${index}" class="search-catalog-btn text-blue-600 text-xs hover:underline ml-2">(buscar)</button>
+                        </div>
+                    </td>
+                    <td class="p-2"><input type="number" value="${item.cantidad || 1}" data-index="${index}" data-field="cantidad" class="item-input w-full p-1 border rounded"></td>
+                    <td class="p-2"><input type="number" value="${item.unidades_por_paquete || 1}" data-index="${index}" data-field="unidades_por_paquete" class="item-input w-full p-1 border rounded"></td>
+                    <td class="p-2"><input type="number" step="0.01" value="${totalBase.toFixed(2)}" data-index="${index}" data-field="total_linea" class="item-input w-full p-1 border rounded"></td>
+                    <td class="p-2 font-medium text-right precio-final-cell">$${precioFinalCalculado.toFixed(2)}</td>
+                    <td class="p-2 font-semibold text-right total-linea-final-cell">$${totalLineaFinalCalculado.toFixed(2)}</td>
+                </tr>
+            `;
+        });
+
+        itemsTableHTML += `</tbody></table>`;
+        tableContainer.innerHTML = itemsTableHTML;
+        
+        updateGrandTotal();
+    }
+    
+    function updateGrandTotal() {
+        const ivaPercent = parseFloat(document.getElementById('iva').value) || 0;
+        const tipoCambio = parseFloat(document.getElementById('tipo-cambio').value) || 1;
+        const ivaFactor = 1 + (ivaPercent / 100);
+
+        const granTotalCalculado = extractedItems.reduce((sum, item) => {
+            const totalBase = item.total_linea || 0;
+            return sum + (totalBase * ivaFactor * tipoCambio);
+        }, 0);
+
+        const summaryContainer = document.getElementById('totals-summary');
+        const diferencia = totalFacturaAI - granTotalCalculado;
+        const diffClass = Math.abs(diferencia) < 1 ? 'text-green-600' : 'text-red-600';
+
+        summaryContainer.innerHTML = `
+            <p class="text-sm">Total Factura (IA): <span class="font-bold text-slate-600">$${totalFacturaAI.toFixed(2)}</span></p>
+            <p class="text-lg">Total Calculado: <span class="font-bold text-slate-900">$${granTotalCalculado.toFixed(2)}</span></p>
+            <p class="text-sm ${diffClass}">Diferencia: <span class="font-bold">$${diferencia.toFixed(2)}</span></p>
+        `;
+    }
+
+    // Funciones de búsqueda y modal (sin cambios)
+    async function openSearchModal(index) {
+        const item = extractedItems[index];
+        modalTitle.textContent = 'Buscar Producto en Catálogo';
+        modalContainer.classList.remove('max-w-4xl');
+        modalContainer.classList.add('max-w-2xl');
+        modalContent.innerHTML = `
+            <div>
+                <label for="search-input" class="block text-sm font-medium text-slate-700">Buscar por descripción:</label>
+                <input type="text" id="search-input" value="${item.descripcion}" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2">
+                <div id="search-results-loader" class="hidden text-center py-4"><div class="spinner w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto"></div></div>
+                <div id="search-results" class="mt-4 max-h-64 overflow-y-auto"></div>
+            </div>
+        `;
+        detailsModal.classList.remove('hidden');
+
+        const searchInput = document.getElementById('search-input');
+        searchInput.addEventListener('input', () => performSearch(searchInput.value, index));
+        performSearch(item.descripcion, index);
+    }
+
+    async function performSearch(searchTerm, itemIndex) {
+        const loader = document.getElementById('search-results-loader');
+        const resultsContainer = document.getElementById('search-results');
+        if (!searchTerm) {
+            resultsContainer.innerHTML = '';
+            return;
+        }
+        loader.classList.remove('hidden');
+        resultsContainer.innerHTML = '';
+
+        try {
+            const response = await fetch(BIGQUERY_API_URL, {
+                method: 'POST',
+                mode: 'cors',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ searchTerm: searchTerm })
+            });
+            const result = await response.json();
+            if (result.success) {
+                displaySearchResults(result.data, itemIndex);
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            resultsContainer.innerHTML = `<p class="text-red-500">Error al buscar: ${error.message}</p>`;
+        } finally {
+            loader.classList.add('hidden');
+        }
+    }
+
+    function displaySearchResults(results, itemIndex) {
+        const resultsContainer = document.getElementById('search-results');
+        if (results.length === 0) {
+            resultsContainer.innerHTML = '<p class="text-slate-500">No se encontraron productos.</p>';
+            return;
+        }
+        resultsContainer.innerHTML = results.map(product => `
+            <div class="p-3 border rounded-lg mb-2 hover:bg-slate-100 cursor-pointer select-product-btn" data-clave="${product.Clave}" data-desc="${product.Descripcion}">
+                <p class="font-semibold">${product.Descripcion}</p>
+                <p class="text-sm text-slate-600">Clave: ${product.Clave}</p>
+            </div>
+        `).join('');
+
+        document.querySelectorAll('.select-product-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                extractedItems[itemIndex].clave_catalogo = btn.dataset.clave;
+                extractedItems[itemIndex].desc_catalogo = btn.dataset.desc;
+                detailsModal.classList.add('hidden');
+                modalContainer.classList.add('max-w-4xl');
+                modalContainer.classList.remove('max-w-2xl');
+                renderItemsTable();
+            });
+        });
+    }
+    
+    /**
+     * CORREGIDO: Guarda los datos correctos en Firestore, incluyendo 'unidades_por_paquete'
+     */
+    async function handleFormSubmit(e) {
+        e.preventDefault();
+        const submitButton = e.target.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        submitButton.innerHTML = `<div class="spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full mx-auto"></div>`;
+        
+        if (imageUrls.length === 0) {
+            showToast('Por favor, sube al menos una imagen de la factura.', 'error');
+            submitButton.disabled = false;
+            submitButton.textContent = 'Guardar Registro';
+            return;
+        }
+
+        const form = e.target;
+        const proveedor = form.proveedor.value.trim();
+        const numeroFactura = form.numero_factura.value.trim();
+
+        if (proveedor && numeroFactura) {
+            const q = query(purchasesCollection, where("proveedor", "==", proveedor), where("numero_factura", "==", numeroFactura));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                showToast('Error: Ya existe una factura con ese número para este proveedor.', 'error');
+                submitButton.disabled = false;
+                submitButton.textContent = 'Guardar Registro';
+                return;
+            }
+        }
+        
+        const ivaPercent = parseFloat(document.getElementById('iva').value) || 0;
+        const tipoCambio = parseFloat(document.getElementById('tipo-cambio').value) || 1;
+        const ivaFactor = 1 + (ivaPercent / 100);
+
+        const finalItems = extractedItems.map(item => {
+            const totalBase = item.total_linea || 0;
+            const totalLineaFinal = totalBase * ivaFactor * tipoCambio;
+            const cantidadTotalUnidades = (item.cantidad || 0) * (item.unidades_por_paquete || 0);
+            const precioFinal = cantidadTotalUnidades > 0 ? totalLineaFinal / cantidadTotalUnidades : 0;
+
+            return {
+                descripcion_factura: item.descripcion,
+                clave_catalogo: item.clave_catalogo,
+                desc_catalogo: item.desc_catalogo,
+                cantidad_factura: item.cantidad,
+                total_linea_base: totalBase,
+                unidades_por_paquete: item.unidades_por_paquete,
+                precio_final: precioFinal,
+                total_linea_final: totalLineaFinal,
+                recibido: false
+            };
+        });
+
+        const purchaseData = {
+            fecha: form.fecha.value,
+            proveedor: proveedor,
+            numero_factura: numeroFactura,
+            total: totalFacturaAI,
+            sucursal: form.sucursal.value,
+            transporte: form.transporte.value,
+            faltantes: form.faltantes.value,
+            images: imageUrls,
+            comments: [],
+            items: finalItems,
+            iva_aplicado: ivaPercent,
+            tipo_cambio_aplicado: tipoCambio,
+            createdAt: new Date(),
+            createdBy: userId,
+        };
+
+        try {
+            await addDoc(purchasesCollection, purchaseData);
+            showToast('Compra registrada con éxito.', 'success');
+            hideRegisterForm();
+            form.reset();
+            imageUrls = [];
+            extractedItems = [];
+            totalFacturaAI = 0;
+        } catch (error) {
+            console.error("Error al guardar el documento: ", error);
+            showToast(`Error al guardar: ${error.message}`, 'error');
+        } finally {
+             submitButton.disabled = false;
+             submitButton.textContent = 'Guardar Registro';
+        }
+    }
+
+    // Funciones de historial y detalles (sin cambios funcionales)
+     function listenToPurchases() {
+        const q = query(purchasesCollection, orderBy("createdAt", "desc"));
+        onSnapshot(q, (snapshot) => {
+            historyLoader.classList.add('hidden');
+            if (snapshot.empty) {
+                historyList.innerHTML = '<p class="text-center text-slate-500 py-8">No hay registros de compras todavía.</p>';
+                return;
+            }
+            historyList.innerHTML = '';
+            snapshot.forEach(doc => {
+                const purchase = doc.data();
+                const card = document.createElement('div');
+                card.className = 'border border-slate-200 p-4 rounded-lg flex justify-between items-center hover:bg-slate-50 transition-colors';
+                card.innerHTML = `
+                    <div>
+                        <p class="font-bold text-lg text-slate-800">${purchase.proveedor} <span class="font-normal text-base text-slate-500">#${purchase.numero_factura || 'N/A'}</span></p>
+                        <p class="text-sm text-slate-500">Fecha: ${purchase.fecha} | Total: $${(purchase.total || 0).toFixed(2)}</p>
+                    </div>
+                    <button data-id="${doc.id}" class="view-details-btn bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-2 px-4 rounded-lg">Ver Detalles</button>
+                `;
+                historyList.appendChild(card);
+            });
+        });
+    }
+    
+    async function showDetails(docId) {
+        try {
+            const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                modalTitle.textContent = 'Detalles de la Compra';
+                modalContainer.classList.add('max-w-4xl');
+                modalContainer.classList.remove('max-w-2xl');
+                const data = docSnap.data();
+                modalContent.innerHTML = generateModalContent(docId, data);
+                detailsModal.classList.remove('hidden');
+                document.getElementById('add-comment-form').addEventListener('submit', (e) => handleAddComment(e, docId));
+                document.getElementById('add-image-input').addEventListener('change', (e) => handleAddNewImage(e, docId));
+                document.querySelectorAll('.item-received-checkbox').forEach(checkbox => {
+                    checkbox.addEventListener('change', (e) => handleItemReceivedToggle(e, docId));
+                });
+            } else {
+                showToast('No se encontró el registro.', 'error');
+            }
+        } catch (error) {
+            showToast(`Error al cargar detalles: ${error.message}`, 'error');
+        }
+    }
+
+    function generateModalContent(docId, data) {
+        const imagesHTML = (data.images || []).map(imgSrc => `<a href="${imgSrc}" target="_blank"><img src="${imgSrc}" class="w-full h-auto max-h-80 object-contain rounded-lg border mb-2"></a>`).join('');
+        const commentsHTML = (data.comments || []).map(comment => `<div class="bg-slate-100 p-3 rounded-lg"><p class="text-sm">${comment.text}</p><p class="text-xs text-right text-slate-400 mt-1">${new Date(comment.createdAt.toDate()).toLocaleString()}</p></div>`).join('<div class="my-2"></div>') || '<p class="text-sm text-slate-400">No hay comentarios.</p>';
+
+        let itemsHTML = '<p class="text-sm text-slate-400">No se registraron artículos para esta compra.</p>';
+        if (data.items && data.items.length > 0) {
+            itemsHTML = `
+                <table class="w-full text-sm item-table border-collapse">
+                    <thead>
+                        <tr class="border-b">
+                            <th class="w-10">Rec.</th>
+                            <th>Descripción</th>
+                            <th>Cant.</th>
+                            <th>UxP</th>
+                            <th>P. Final</th>
+                            <th>Total Final</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.items.map((item, index) => `
+                            <tr class="border-b border-slate-100">
+                                <td><input type="checkbox" data-index="${index}" class="item-received-checkbox" ${item.recibido ? 'checked' : ''}></td>
+                                <td>
+                                  <div class="font-medium">${item.desc_catalogo || item.descripcion_factura}</div>
+                                  <div class="text-xs text-slate-500">${item.clave_catalogo || 'Sin vincular'}</div>
+                                </td>
+                                <td>${item.cantidad_factura}</td>
+                                <td>${item.unidades_por_paquete}</td>
+                                <td>$${(item.precio_final || 0).toFixed(2)}</td>
+                                <td class="font-semibold">$${(item.total_linea_final || 0).toFixed(2)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        return `
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="font-bold mb-2">Detalles Generales</h3>
+                    <div class="grid grid-cols-2 gap-4 mb-6 text-sm bg-slate-50 p-4 rounded-lg">
+                        <p><strong class="font-medium text-slate-500">Proveedor:</strong><br>${data.proveedor}</p>
+                        <p><strong class="font-medium text-slate-500">No. Factura:</strong><br>${data.numero_factura || 'No especificado'}</p>
+                        <p><strong class="font-medium text-slate-500">Fecha:</strong><br>${data.fecha}</p>
+                        <p><strong class="font-medium text-slate-500">Total Factura:</strong><br>$${(data.total || 0).toFixed(2)}</p>
+                        <p><strong class="font-medium text-slate-500">Sucursal:</strong><br>${data.sucursal}</p>
+                        <p><strong class="font-medium text-slate-500">Transporte:</strong><br>${data.transporte}</p>
+                        <p><strong class="font-medium text-slate-500">IVA Aplicado:</strong><br>${data.iva_aplicado || 0}%</p>
+                        <p><strong class="font-medium text-slate-500">Tipo de Cambio:</strong><br>${data.tipo_cambio_aplicado || 1}</p>
+                        <p class="col-span-2"><strong class="font-medium text-slate-500">Faltantes:</strong><br>${data.faltantes}</p>
+                    </div>
+                    <h3 class="font-bold mb-2">Imágenes Adjuntas</h3>
+                    <div class="p-4 bg-slate-50 rounded-lg mb-6">${imagesHTML}</div>
+                    <label for="add-image-input" class="mt-4 inline-block cursor-pointer bg-blue-100 text-blue-800 hover:bg-blue-200 text-sm font-medium py-2 px-4 rounded-lg">
+                        <span class="material-icons text-base align-middle mr-1">add_photo_alternate</span>
+                        Añadir otra imagen
+                    </label>
+                    <input type="file" id="add-image-input" class="hidden" accept="image/*">
+                </div>
+                <div>
+                    <h3 class="font-bold mb-2">Artículos de la Factura</h3>
+                    <div class="bg-slate-50 p-4 rounded-lg mb-6">${itemsHTML}</div>
+                    <h3 class="font-bold mb-2">Comentarios</h3>
+                    <div class="space-y-3 mb-4">${commentsHTML}</div>
+                    <form id="add-comment-form">
+                        <textarea id="comment-text" placeholder="Escribe un comentario..." required class="w-full p-2 border rounded-lg"></textarea>
+                        <button type="submit" class="mt-2 bg-emerald-500 text-white font-medium py-2 px-4 rounded-lg">Añadir Comentario</button>
+                    </form>
+                </div>
+            </div>
+        `;
+    }
+    
+    async function handleItemReceivedToggle(e, docId) {
+        const checkbox = e.target;
+        const itemIndex = parseInt(checkbox.dataset.index);
+
+        const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
+        try {
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                const purchaseData = docSnap.data();
+                const updatedItems = [...purchaseData.items];
+                updatedItems[itemIndex].recibido = checkbox.checked;
+                
+                await updateDoc(docRef, { items: updatedItems });
+                showToast(`Item #${itemIndex + 1} actualizado.`, 'success');
+            }
+        } catch (error) {
+            showToast(`Error al actualizar el item: ${error.message}`, 'error');
+            checkbox.checked = !checkbox.checked;
+        }
+    }
+
+    async function handleAddComment(e, docId) {
+        e.preventDefault();
+        const form = e.target;
+        const commentText = form.querySelector('#comment-text').value;
+        if (!commentText.trim()) return;
+        const newComment = { text: commentText, createdAt: new Date(), authorId: userId };
+        const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
+        try {
+            await updateDoc(docRef, { comments: arrayUnion(newComment) });
+            form.reset();
+            showToast('Comentario añadido.', 'success');
+        } catch (error) {
+            showToast(`Error al añadir comentario: ${error.message}`, 'error');
+        }
+    }
+    
+    async function handleAddNewImage(e, docId) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        showToast('Subiendo imagen...', 'success');
+        try {
+            const storageRef = ref(storage, `invoices/${userId}/${docId}/${Date.now()}-${file.name}`);
+            const snapshot = await uploadBytes(storageRef, file);
+            const downloadURL = await getDownloadURL(snapshot.ref);
+
+            const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
+            await updateDoc(docRef, { images: arrayUnion(downloadURL) });
+            showToast('Imagen añadida con éxito.', 'success');
+        } catch (error) {
+            showToast(`Error al añadir imagen: ${error.message}`, 'error');
+        }
+    }
+
+    function showToast(message, type = 'success') {
+        const toast = document.createElement('div');
+        const bgColor = type === 'success' ? 'bg-emerald-500' : 'bg-red-500';
+        toast.className = `toast ${bgColor} text-white font-bold py-3 px-5 rounded-lg shadow-xl transform translate-y-4 opacity-0`;
+        toast.textContent = message;
+        toastContainer.appendChild(toast);
+        setTimeout(() => { toast.classList.remove('translate-y-4', 'opacity-0'); }, 10);
+        setTimeout(() => {
+            toast.classList.add('translate-y-4', 'opacity-0');
+            toast.addEventListener('transitionend', () => toast.remove());
+        }, 3000);
+    }
+
+    // --- INICIALIZACIÓN Y EVENT LISTENERS GLOBALES ---
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            userId = user.uid;
+            listenToPurchases();
+        }
+    });
+
+    (async () => {
+        try {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
+            }
+        } catch (error) {
+            console.error("Error de autenticación inicial:", error);
+            showToast("No se pudo autenticar. La app podría no funcionar.", "error");
+        }
+    })();
+
+    showRegisterFormBtn.addEventListener('click', showRegisterForm);
+    
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('.view-details-btn')) {
+            const id = e.target.closest('.view-details-btn').dataset.id;
+            showDetails(id);
+        }
+    });
+
+    closeModalBtn.addEventListener('click', () => {
+        detailsModal.classList.add('hidden');
+    });
+</script>
+</body>
+</html>
