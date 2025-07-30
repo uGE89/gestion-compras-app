@@ -429,7 +429,8 @@
                     <td class="p-2">
                         <input type="text" value="${item.descripcion || ''}" data-index="${index}" data-field="descripcion" class="item-input w-full p-1 border rounded">
                         <div class="text-xs text-slate-500 mt-1">
-                            ${item.desc_catalogo || (item.clave_catalogo || 'Sin vincular')}
+                            ${item.desc_catalogo || 'Sin vincular'}
+                            ${item.clave_catalogo ? `<span class="copy-clave-btn cursor-pointer text-blue-600 ml-1" data-clave="${item.clave_catalogo}" title="Copiar clave">(${item.clave_catalogo})</span>` : ''}
                             <button type="button" data-index="${index}" class="search-catalog-btn text-blue-600 text-xs hover:underline ml-2">(buscar)</button>
                         </div>
                     </td>
@@ -707,7 +708,9 @@
                                 <td><input type="checkbox" data-index="${index}" class="item-received-checkbox" ${item.recibido ? 'checked' : ''}></td>
                                 <td>
                                   <div class="font-medium">${item.desc_catalogo || item.descripcion_factura}</div>
-                                  <div class="text-xs text-slate-500">${item.clave_catalogo || 'Sin vincular'}</div>
+                                  <div class="text-xs text-slate-500">
+                                    ${item.clave_catalogo ? `<span class="copy-clave-btn cursor-pointer" data-clave="${item.clave_catalogo}" title="Copiar clave">${item.clave_catalogo}</span>` : 'Sin vincular'}
+                                  </div>
                                 </td>
                                 <td>${item.cantidad_factura}</td>
                                 <td>${item.unidades_por_paquete}</td>
@@ -848,10 +851,26 @@
 
     showRegisterFormBtn.addEventListener('click', showRegisterForm);
     
+    function handleCopyClave(target) {
+        const clave = target.dataset.clave;
+        if (clave) {
+            navigator.clipboard.writeText(clave);
+            showToast('Clave copiada.', 'success');
+        }
+    }
+
     document.addEventListener('click', (e) => {
         if (e.target.closest('.view-details-btn')) {
             const id = e.target.closest('.view-details-btn').dataset.id;
             showDetails(id);
+        } else if (e.target.closest('.copy-clave-btn')) {
+            handleCopyClave(e.target.closest('.copy-clave-btn'));
+        }
+    });
+
+    document.addEventListener('dblclick', (e) => {
+        if (e.target.closest('.copy-clave-btn')) {
+            handleCopyClave(e.target.closest('.copy-clave-btn'));
         }
     });
 
