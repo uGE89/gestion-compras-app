@@ -94,27 +94,36 @@
     <!-- Contenedor de Notificaciones (Toast) -->
     <div id="toast-container" class="fixed bottom-4 right-4 z-50"></div>
 
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js"></script>
-    <script src="/__/firebase/init.js"></script>
+
 
 <script type="module">
-    const { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } = firebase.auth;
-    const { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, arrayUnion, query, orderBy, where, getDocs } = firebase.firestore;
-    const { getStorage, ref, uploadBytes, getDownloadURL } = firebase.storage;
+    // Importaciones de Firebase
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, arrayUnion, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-    const auth = getAuth();
-    const db = getFirestore();
-    const storage = getStorage();
-
+    // --- CONFIGURACIÓN DE FIREBASE ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyCPeJ-uaDBJfX6wmEZc2EV8hgzq7Z_Gw4o",
+        authDomain: "gestion-compras-app.firebaseapp.com",
+        projectId: "gestion-compras-app",
+        storageBucket: "gestion-compras-app.firebasestorage.app",
+        messagingSenderId: "546037523332",
+        appId: "1:546037523332:web:7f71a9760fd3885b0df3d1",
+        measurementId: "G-ZTVEZBMBK0"
+    };
+    const appId = firebaseConfig.projectId;
+    
     // --- URL DE TU API DE APPS SCRIPT ---
     const BIGQUERY_API_URL = 'https://script.google.com/macros/s/AKfycbz-Ix7Mh-ZdmpsJbRaq2ZdcCChHX9TjL2SEi66LhySq9DAoxcSrbEizCQL2QJBQCl1B/exec';
 
     // --- INICIALIZACIÓN DE FIREBASE ---
-    const projectId = firebase.app().options.projectId;
-    const purchasesCollection = collection(db, `artifacts/${projectId}/public/data/compras`);
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+    const purchasesCollection = collection(db, `artifacts/${appId}/public/data/compras`);
 
     let userId = null;
     let extractedItems = [];
@@ -420,8 +429,7 @@
                     <td class="p-2">
                         <input type="text" value="${item.descripcion || ''}" data-index="${index}" data-field="descripcion" class="item-input w-full p-1 border rounded">
                         <div class="text-xs text-slate-500 mt-1">
-                            ${item.desc_catalogo ? `<span>${item.desc_catalogo}</span>` : ''}
-                            ${item.clave_catalogo ? `<span class="copy-clave-btn cursor-pointer underline ml-1" data-clave="${item.clave_catalogo}" title="Copiar clave">${item.clave_catalogo}</span>` : (item.desc_catalogo ? '' : 'Sin vincular')}
+                            ${item.desc_catalogo || (item.clave_catalogo || 'Sin vincular')}
                             <button type="button" data-index="${index}" class="search-catalog-btn text-blue-600 text-xs hover:underline ml-2">(buscar)</button>
                         </div>
                     </td>
@@ -653,7 +661,7 @@
     
     async function showDetails(docId) {
         try {
-            const docRef = doc(db, `artifacts/${projectId}/public/data/compras`, docId);
+            const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
                 modalTitle.textContent = 'Detalles de la Compra';
@@ -753,7 +761,7 @@
         const checkbox = e.target;
         const itemIndex = parseInt(checkbox.dataset.index);
 
-        const docRef = doc(db, `artifacts/${projectId}/public/data/compras`, docId);
+        const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
         try {
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
@@ -776,7 +784,7 @@
         const commentText = form.querySelector('#comment-text').value;
         if (!commentText.trim()) return;
         const newComment = { text: commentText, createdAt: new Date(), authorId: userId };
-        const docRef = doc(db, `artifacts/${projectId}/public/data/compras`, docId);
+        const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
         try {
             await updateDoc(docRef, { comments: arrayUnion(newComment) });
             form.reset();
@@ -796,7 +804,7 @@
             const snapshot = await uploadBytes(storageRef, file);
             const downloadURL = await getDownloadURL(snapshot.ref);
 
-            const docRef = doc(db, `artifacts/${projectId}/public/data/compras`, docId);
+            const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
             await updateDoc(docRef, { images: arrayUnion(downloadURL) });
             showToast('Imagen añadida con éxito.', 'success');
         } catch (error) {
@@ -844,12 +852,6 @@
         if (e.target.closest('.view-details-btn')) {
             const id = e.target.closest('.view-details-btn').dataset.id;
             showDetails(id);
-        }
-        const copyEl = e.target.closest('.copy-clave-btn');
-        if (copyEl && copyEl.dataset.clave) {
-            navigator.clipboard.writeText(copyEl.dataset.clave).then(() => {
-                showToast('Clave copiada', 'success');
-            });
         }
     });
 
