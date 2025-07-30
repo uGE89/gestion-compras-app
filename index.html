@@ -113,7 +113,8 @@
     const BIGQUERY_API_URL = 'https://script.google.com/macros/s/AKfycbz-Ix7Mh-ZdmpsJbRaq2ZdcCChHX9TjL2SEi66LhySq9DAoxcSrbEizCQL2QJBQCl1B/exec';
 
     // --- INICIALIZACIÓN DE FIREBASE ---
-    const purchasesCollection = collection(db, `artifacts/${appId}/public/data/compras`);
+    const projectId = firebase.app().options.projectId;
+    const purchasesCollection = collection(db, `artifacts/${projectId}/public/data/compras`);
 
     let userId = null;
     let extractedItems = [];
@@ -652,7 +653,7 @@
     
     async function showDetails(docId) {
         try {
-            const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
+            const docRef = doc(db, `artifacts/${projectId}/public/data/compras`, docId);
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
                 modalTitle.textContent = 'Detalles de la Compra';
@@ -752,7 +753,7 @@
         const checkbox = e.target;
         const itemIndex = parseInt(checkbox.dataset.index);
 
-        const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
+        const docRef = doc(db, `artifacts/${projectId}/public/data/compras`, docId);
         try {
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
@@ -775,7 +776,7 @@
         const commentText = form.querySelector('#comment-text').value;
         if (!commentText.trim()) return;
         const newComment = { text: commentText, createdAt: new Date(), authorId: userId };
-        const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
+        const docRef = doc(db, `artifacts/${projectId}/public/data/compras`, docId);
         try {
             await updateDoc(docRef, { comments: arrayUnion(newComment) });
             form.reset();
@@ -795,7 +796,7 @@
             const snapshot = await uploadBytes(storageRef, file);
             const downloadURL = await getDownloadURL(snapshot.ref);
 
-            const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
+            const docRef = doc(db, `artifacts/${projectId}/public/data/compras`, docId);
             await updateDoc(docRef, { images: arrayUnion(downloadURL) });
             showToast('Imagen añadida con éxito.', 'success');
         } catch (error) {
