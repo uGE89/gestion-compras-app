@@ -94,6 +94,14 @@
     <!-- Contenedor de Notificaciones (Toast) -->
     <div id="toast-container" class="fixed bottom-4 right-4 z-50"></div>
 
+    <!-- Indicador de carga del catálogo de productos -->
+    <div id="catalog-loader" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+        <div class="bg-white p-4 rounded-lg flex items-center">
+            <div class="spinner w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full mr-3"></div>
+            <span class="text-slate-700">Cargando catálogo de productos...</span>
+        </div>
+    </div>
+
 
 
 <script type="module">
@@ -132,6 +140,7 @@
     let extractedItems = [];
     let totalFacturaAI = 0;
     let imageUrls = [];
+    let productCatalog = [];
 
     // --- ELEMENTOS DEL DOM ---
     const showRegisterFormBtn = document.getElementById('show-register-form-btn');
@@ -144,6 +153,7 @@
     const closeModalBtn = document.getElementById('close-modal-btn');
     const modalContent = document.getElementById('modal-content');
     const toastContainer = document.getElementById('toast-container');
+    const catalogLoader = document.getElementById('catalog-loader');
 
     // --- LÓGICA DE LA APLICACIÓN ---
 
@@ -165,6 +175,28 @@
         registerSection.classList.add('hidden');
         registerSection.innerHTML = '';
         showRegisterFormBtn.classList.remove('hidden');
+    }
+
+    async function loadProductCatalog() {
+        catalogLoader.classList.remove('hidden');
+        try {
+            const response = await fetch(BIGQUERY_API_URL, {
+                method: 'POST',
+                mode: 'cors',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ loadCatalog: true })
+            });
+            const result = await response.json();
+            if (result.success) {
+                productCatalog = result.data;
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            showToast(`Error al cargar catálogo: ${error.message}`, 'error');
+        } finally {
+            catalogLoader.classList.add('hidden');
+        }
     }
 
     function getRegisterFormHTML(data = {}) {
@@ -473,7 +505,7 @@
         `;
     }
 
-    // Funciones de búsqueda y modal (sin cambios)
+    // Funciones de búsqueda y modal
     async function openSearchModal(index) {
         const item = extractedItems[index];
         modalTitle.textContent = 'Buscar Producto en Catálogo';
@@ -508,24 +540,13 @@
         loader.classList.remove('hidden');
         resultsContainer.innerHTML = '';
 
-        try {
-            const response = await fetch(BIGQUERY_API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ searchTerm: searchTerm })
-            });
-            const result = await response.json();
-            if (result.success) {
-                displaySearchResults(result.data, itemIndex);
-            } else {
-                throw new Error(result.error);
-            }
-        } catch (error) {
-            resultsContainer.innerHTML = `<p class="text-red-500">Error al buscar: ${error.message}</p>`;
-        } finally {
-            loader.classList.add('hidden');
-        }
+        const terms = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
+        const results = productCatalog.filter(prod => {
+            const haystack = `${prod.Descripcion} ${prod.Clave}`.toLowerCase();
+            return terms.every(t => haystack.includes(t));
+        });
+        displaySearchResults(results, itemIndex);
+        loader.classList.add('hidden');
     }
 
     function displaySearchResults(results, itemIndex) {
@@ -848,6 +869,7 @@
             } else {
                 await signInAnonymously(auth);
             }
+            await loadProductCatalog();
         } catch (error) {
             console.error("Error de autenticación inicial:", error);
             showToast("No se pudo autenticar. La app podría no funcionar.", "error");
