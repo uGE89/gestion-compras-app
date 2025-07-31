@@ -328,17 +328,17 @@
     async function getAIData(base64DataArray) {
         const apiKey = firebaseConfig.apiKey;
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-        
+
         const parts = [
             { text: "Analiza las siguientes imágenes que componen una factura de varias páginas. Consolida todos los artículos en una sola lista. El proveedor, fecha y el total final suelen estar en la primera o última página. Responde únicamente con un objeto JSON con las claves 'fecha' (YYYY-MM-DD), 'proveedor', 'total' (número), y 'items' (array de objetos con 'descripcion', 'cantidad' y 'total_linea'). Si un dato no se encuentra, su valor debe ser null o un array vacío para 'items'." }
         ];
 
         base64DataArray.forEach(data => {
-            parts.push({ inlineData: { mimeType: "image/jpeg", data: data } });
+            parts.push({ inlineData: { mimeType: "image/jpeg", data } });
         });
 
         const payload = {
-            contents: [{ role: "user", parts: parts }],
+            contents: [{ role: "user", parts }],
             generationConfig: { responseMimeType: "application/json" }
         };
 
@@ -354,7 +354,46 @@
             const result = await response.json();
             if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
                 const text = result.candidates[0].content.parts[0].text;
-                return JSON.parse(text);
+
+                // --- Step 1: Visual Extraction ---
+                const extractedData = JSON.parse(text);
+
+                // --- Step 2: Text Correction ---
+                if (extractedData.items && extractedData.items.length > 0) {
+                    const descriptionsToCorrect = extractedData.items.map(item => item.descripcion);
+                    const correctionPrompt = `Por favor, corrige los errores de ortografía y posibles errores de OCR en el siguiente arreglo de descripciones de productos. Responde únicamente con un arreglo JSON de strings que contenga las descripciones corregidas, manteniendo el mismo orden y la misma cantidad de elementos. No añadas texto introductorio. El arreglo a corregir es: ${JSON.stringify(descriptionsToCorrect)}`;
+
+                    const correctionPayload = {
+                        contents: [{ parts: [{ text: correctionPrompt }] }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    };
+
+                    try {
+                        const correctionResponse = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(correctionPayload)
+                        });
+
+                        if (correctionResponse.ok) {
+                            const correctionResult = await correctionResponse.json();
+                            if (correctionResult.candidates && correctionResult.candidates[0].content && correctionResult.candidates[0].content.parts[0]) {
+                                const correctedDescriptions = JSON.parse(correctionResult.candidates[0].content.parts[0].text);
+                                if (Array.isArray(correctedDescriptions) && correctedDescriptions.length === descriptionsToCorrect.length) {
+                                    correctedDescriptions.forEach((correctedDesc, index) => {
+                                        if (extractedData.items[index]) {
+                                            extractedData.items[index].descripcion = correctedDesc;
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    } catch (correctionError) {
+                        console.error("Error al corregir descripciones:", correctionError);
+                    }
+                }
+
+                return extractedData;
             }
             return null;
         } catch (error) {
