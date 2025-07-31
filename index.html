@@ -109,7 +109,7 @@
     <div id="toast-container" class="fixed bottom-4 right-4 z-50"></div>
 
     <!-- Indicador de carga del catálogo de productos -->
-    <div id="catalog-loader" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div id="catalog-loader" class="hidden fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
         <div class="bg-white p-4 rounded-lg flex items-center">
             <div class="spinner w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full mr-3"></div>
             <span class="text-slate-700">Cargando catálogo de productos...</span>
@@ -127,18 +127,18 @@
 
     // --- CONFIGURACIÓN DE FIREBASE ---
     const firebaseConfig = {
-        apiKey: "AIzaSyCPeJ-uaDBJfX6wmEZc2EV8hgzq7Z_Gw4o",
-        authDomain: "gestion-compras-app.firebaseapp.com",
-        projectId: "gestion-compras-app",
-        storageBucket: "gestion-compras-app.firebasestorage.app",
-        messagingSenderId: "546037523332",
-        appId: "1:546037523332:web:7f71a9760fd3885b0df3d1",
-        measurementId: "G-ZTVEZBMBK0"
+  apiKey: "5",
+  authDomain: "5",
+  projectId: "5",
+  storageBucket: "5",
+  messagingSenderId: "5",
+  appId: "5",
+  measurementId: "5"
     };
     const appId = firebaseConfig.projectId;
     
     // --- URL DE TU API DE APPS SCRIPT ---
-    const BIGQUERY_API_URL = 'https://script.google.com/macros/s/AKfycbz-Ix7Mh-ZdmpsJbRaq2ZdcCChHX9TjL2SEi66LhySq9DAoxcSrbEizCQL2QJBQCl1B/exec';
+    const BIGQUERY_API_URL = 'https://script.google.com/macros/s/AKfycbzJN3owPwvd4pFf8MELg6oodJk3ge2cNvxjsf7CWy_2wia-Lz83ftFdGx5VzKxoABln/exec';
 
     // --- INICIALIZACIÓN DE FIREBASE ---
     const app = initializeApp(firebaseConfig);
@@ -201,21 +201,33 @@
     async function loadProductCatalog() {
         catalogLoader.classList.remove('hidden');
         try {
+            // Se solicita el catálogo completo enviando un término de búsqueda vacío.
+            // Usamos 'text/plain' como Content-Type para evitar problemas de CORS con despliegues simples de Apps Script.
             const response = await fetch(BIGQUERY_API_URL, {
                 method: 'POST',
                 mode: 'cors',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ loadCatalog: true })
+                body: JSON.stringify({ searchTerm: '' }) 
             });
+            
+            if (!response.ok) {
+                throw new Error(`Error de red: ${response.statusText}`);
+            }
+
             const result = await response.json();
             if (result.success) {
                 productCatalog = result.data;
                 isCatalogReady = true;
+                console.log("Catálogo de productos cargado exitosamente.");
+// Muestra las primeras 5 filas en la consola para verificación.
+console.log("Número de productos recibidos:", productCatalog.length);
+console.table(productCatalog.slice(0, 5));
             } else {
-                throw new Error(result.error);
+                throw new Error(result.error || "Error desconocido al obtener el catálogo.");
             }
         } catch (error) {
             showToast(`Error al cargar catálogo: ${error.message}`, 'error');
+            console.error("Error en loadProductCatalog:", error);
         } finally {
             catalogLoader.classList.add('hidden');
         }
@@ -255,7 +267,7 @@
                  <div id="calculation-section" class="mt-8 hidden"></div>
                  <div class="mt-8 text-right"><button type="submit" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-lg shadow-md">Guardar Registro</button></div>
              </form>
-         `;
+          `;
     }
     
     async function handleFileSelect(e) {
@@ -329,7 +341,7 @@
 
     async function getAIData(base64DataArray) {
         const apiKey = firebaseConfig.apiKey;
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
         const parts = [
             { text: "Analiza las siguientes imágenes que componen una factura de varias páginas. Consolida todos los artículos en una sola lista. El proveedor, fecha y el total final suelen estar en la primera o última página. Responde únicamente con un objeto JSON con las claves 'fecha' (YYYY-MM-DD), 'proveedor', 'total' (número), y 'items' (array de objetos con 'descripcion', 'cantidad' y 'total_linea'). Si un dato no se encuentra, su valor debe ser null o un array vacío para 'items'." }
@@ -364,14 +376,15 @@
                 if (extractedData.items && extractedData.items.length > 0) {
                     const descriptionsToCorrect = extractedData.items.map(item => item.descripcion);
                     const correctionPrompt = `Por favor, corrige los errores de ortografía y posibles errores de OCR en el siguiente arreglo de descripciones de productos. Responde únicamente con un arreglo JSON de strings que contenga las descripciones corregidas, manteniendo el mismo orden y la misma cantidad de elementos. No añadas texto introductorio. El arreglo a corregir es: ${JSON.stringify(descriptionsToCorrect)}`;
-
+                    
+                    const correctionApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
                     const correctionPayload = {
                         contents: [{ parts: [{ text: correctionPrompt }] }],
                         generationConfig: { responseMimeType: "application/json" }
                     };
 
                     try {
-                        const correctionResponse = await fetch(apiUrl, {
+                        const correctionResponse = await fetch(correctionApiUrl, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(correctionPayload)
@@ -404,9 +417,6 @@
         }
     }
     
-    /**
-     * CORREGIDO: IVA por defecto restaurado a 15.
-     */
     function displayCalculationUI() {
         const container = document.getElementById('calculation-section');
         container.classList.remove('hidden');
@@ -441,9 +451,6 @@
         });
     }
 
-    /**
-     * CORREGIDO: Se añade 'unidades_por_paquete' al crear una nueva fila.
-     */
     function addNewItemRow() {
         extractedItems.push({
             descripcion: '',
@@ -456,9 +463,6 @@
         renderItemsTable();
     }
 
-    /**
-     * CORREGIDO: La lógica de cálculo ahora actualiza el P. Final y Total Línea Final.
-     */
     function handleTableInput(e) {
         const input = e.target;
         if (!input.matches('.item-input')) return;
@@ -490,9 +494,6 @@
         updateGrandTotal();
     }
     
-    /**
-     * CORREGIDO: Se restaura la estructura de la tabla con todas las columnas.
-     */
     function renderItemsTable() {
         const tableContainer = document.getElementById('items-table-container');
         const ivaPercent = parseFloat(document.getElementById('iva').value) || 0;
@@ -569,7 +570,7 @@
     // Funciones de búsqueda y modal
     async function openSearchModal(index) {
         if (!isCatalogReady) {
-            showToast('El catálogo aún está cargando, por favor espera', 'error');
+            showToast('El catálogo aún no está listo, por favor espera un momento.', 'error');
             return;
         }
         const item = extractedItems[index];
@@ -587,31 +588,30 @@
         detailsModal.classList.remove('hidden');
 
         const searchInput = document.getElementById('search-input');
-        searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                performSearch(searchInput.value, index);
-            }
+        
+        // Realizar búsqueda inicial
+        performSearch(searchInput.value, index);
+
+        searchInput.addEventListener('input', () => {
+            performSearch(searchInput.value, index);
         });
     }
 
-    async function performSearch(searchTerm, itemIndex) {
-        const loader = document.getElementById('search-results-loader');
+    function performSearch(searchTerm, itemIndex) {
         const resultsContainer = document.getElementById('search-results');
-        if (!searchTerm) {
-            resultsContainer.innerHTML = '';
+        
+        if (!isCatalogReady) {
+            resultsContainer.innerHTML = '<p class="text-slate-500">El catálogo aún está cargando...</p>';
             return;
         }
-        loader.classList.remove('hidden');
-        resultsContainer.innerHTML = '';
 
         const terms = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
         const results = productCatalog.filter(prod => {
             const haystack = `${prod.Descripcion} ${prod.Clave}`.toLowerCase();
             return terms.every(t => haystack.includes(t));
-        });
+        }).slice(0, 100); // Limitar a 100 resultados para no sobrecargar el DOM
+
         displaySearchResults(results, itemIndex);
-        loader.classList.add('hidden');
     }
 
     function displaySearchResults(results, itemIndex) {
@@ -639,9 +639,6 @@
         });
     }
     
-    /**
-     * CORREGIDO: Guarda los datos correctos en Firestore, incluyendo 'unidades_por_paquete'
-     */
     async function handleFormSubmit(e) {
         e.preventDefault();
         const submitButton = e.target.querySelector('button[type="submit"]');
@@ -754,7 +751,7 @@
     }
 
     function getReceptionStatus(items = []) {
-        if (items.length === 0) return 'Pendiente';
+        if (!items || items.length === 0) return 'Pendiente';
         const allRec = items.every(it => it.recibido);
         const noneRec = items.every(it => !it.recibido);
         if (allRec) return 'Completo';
@@ -788,7 +785,7 @@
 
     function renderHistory(list) {
         if (!list.length) {
-            historyList.innerHTML = '<p class="text-center text-slate-500 py-8">No hay registros de compras todavía.</p>';
+            historyList.innerHTML = '<p class="text-center text-slate-500 py-8">No se encontraron registros.</p>';
             return;
         }
         historyList.innerHTML = '';
@@ -853,10 +850,10 @@
                             <tr class="border-b border-slate-100">
                                 <td><input type="checkbox" data-index="${index}" class="item-received-checkbox" ${item.recibido ? 'checked' : ''}></td>
                                 <td>
-                                  <div class="font-medium">${item.desc_catalogo || item.descripcion_factura}</div>
-                                  <div class="text-xs text-slate-500">
-                                    ${item.clave_catalogo ? `<span class="copy-clave-btn copy-btn cursor-pointer" data-copy="${item.clave_catalogo}" data-clave="${item.clave_catalogo}" title="Copiar clave">${item.clave_catalogo}</span>` : 'Sin vincular'}
-                                  </div>
+                                    <div class="font-medium">${item.desc_catalogo || item.descripcion_factura}</div>
+                                    <div class="text-xs text-slate-500">
+                                        ${item.clave_catalogo ? `<span class="copy-clave-btn copy-btn cursor-pointer" data-copy="${item.clave_catalogo}" title="Copiar clave">${item.clave_catalogo}</span>` : 'Sin vincular'}
+                                    </div>
                                 </td>
                                 <td><span class="copy-btn cursor-pointer" data-copy="${item.cantidad_factura}" title="Copiar">${item.cantidad_factura}</span></td>
                                 <td>${item.unidades_por_paquete}</td>
@@ -987,6 +984,7 @@
             } else {
                 await signInAnonymously(auth);
             }
+            // Cargar el catálogo al iniciar la app
             await loadProductCatalog();
         } catch (error) {
             console.error("Error de autenticación inicial:", error);
@@ -1004,16 +1002,18 @@
     function handleCopyClave(target) {
         const clave = target.dataset.clave;
         if (clave) {
-            navigator.clipboard.writeText(clave);
-            showToast('Clave copiada.', 'success');
+            navigator.clipboard.writeText(clave)
+                .then(() => showToast('Clave copiada.', 'success'))
+                .catch(err => showToast('Error al copiar.', 'error'));
         }
     }
 
     function handleCopyText(target) {
         const text = target.dataset.copy;
         if (text) {
-            navigator.clipboard.writeText(text);
-            showToast('Copiado.', 'success');
+            navigator.clipboard.writeText(text)
+                .then(() => showToast('Copiado.', 'success'))
+                .catch(err => showToast('Error al copiar.', 'error'));
         }
     }
 
@@ -1022,14 +1022,6 @@
             const id = e.target.closest('.view-details-btn').dataset.id;
             showDetails(id);
         } else if (e.target.closest('.copy-clave-btn')) {
-            handleCopyClave(e.target.closest('.copy-clave-btn'));
-        } else if (e.target.closest('.copy-btn')) {
-            handleCopyText(e.target.closest('.copy-btn'));
-        }
-    });
-
-    document.addEventListener('dblclick', (e) => {
-        if (e.target.closest('.copy-clave-btn')) {
             handleCopyClave(e.target.closest('.copy-clave-btn'));
         } else if (e.target.closest('.copy-btn')) {
             handleCopyText(e.target.closest('.copy-btn'));
