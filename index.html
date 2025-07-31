@@ -531,7 +531,7 @@ const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2
                             <button type="button" data-index="${index}" class="search-catalog-btn text-blue-600 text-xs hover:underline ml-2">(buscar)</button>
                         </div>
                     </td>
-                    <td class="p-2"><input type="number" value="${item.cantidad || 1}" data-index="${index}" data-field="cantidad" class="item-input w-full p-1 border rounded"></td>
+                    <td class="p-2"><input type="number" step="0.01" value="${item.cantidad || 1}" data-index="${index}" data-field="cantidad" class="item-input w-full p-1 border rounded"></td>
                     <td class="p-2"><input type="number" value="${item.unidades_por_paquete || 1}" data-index="${index}" data-field="unidades_por_paquete" class="item-input w-full p-1 border rounded"></td>
                     <td class="p-2"><input type="number" step="0.01" value="${totalBase.toFixed(2)}" data-index="${index}" data-field="total_linea" class="item-input w-full p-1 border rounded"></td>
                     <td class="p-2 font-medium text-right precio-final-cell">$${precioFinalCalculado.toFixed(2)}</td>
