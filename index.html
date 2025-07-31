@@ -685,7 +685,7 @@
     }
 
     function generateModalContent(docId, data) {
-        const imagesHTML = (data.images || []).map(imgSrc => `<a href="${imgSrc}" target="_blank"><img src="${imgSrc}" class="w-full h-auto max-h-80 object-contain rounded-lg border mb-2"></a>`).join('');
+        const imagesHTML = (data.images || []).map(imgSrc => `<a href="${imgSrc}" target="_blank"><img src="${imgSrc}" alt="Factura" class="w-full h-auto max-h-80 object-contain rounded-lg border mb-2"></a>`).join('');
         const commentsHTML = (data.comments || []).map(comment => `<div class="bg-slate-100 p-3 rounded-lg"><p class="text-sm">${comment.text}</p><p class="text-xs text-right text-slate-400 mt-1">${new Date(comment.createdAt.toDate()).toLocaleString()}</p></div>`).join('<div class="my-2"></div>') || '<p class="text-sm text-slate-400">No hay comentarios.</p>';
 
         let itemsHTML = '<p class="text-sm text-slate-400">No se registraron artículos para esta compra.</p>';
