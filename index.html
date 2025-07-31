@@ -490,8 +490,12 @@
         detailsModal.classList.remove('hidden');
 
         const searchInput = document.getElementById('search-input');
-        searchInput.addEventListener('input', () => performSearch(searchInput.value, index));
-        performSearch(item.descripcion, index);
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                performSearch(searchInput.value, index);
+            }
+        });
     }
 
     async function performSearch(searchTerm, itemIndex) {
