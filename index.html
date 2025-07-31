@@ -176,6 +176,15 @@
     const toastContainer = document.getElementById('toast-container');
     const catalogLoader = document.getElementById('catalog-loader');
 
+    function formatDateDDMMYYYY(dateStr) {
+        const date = new Date(dateStr);
+        if (isNaN(date)) return dateStr;
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}-${month}-${year}`;
+    }
+
     // --- LÓGICA DE LA APLICACIÓN ---
 
     function showRegisterForm() {
@@ -795,7 +804,7 @@ const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2
             card.innerHTML = `
                 <div>
                     <p class="font-bold text-lg text-slate-800">${p.proveedor} <span class="font-normal text-base text-slate-500">#${p.numero_factura || 'N/A'}</span></p>
-                    <p class="text-sm text-slate-500">Fecha: ${p.fecha} | Total: $${(p.total || 0).toFixed(2)}</p>
+                    <p class="text-sm text-slate-500">Fecha: ${formatDateDDMMYYYY(p.fecha)} | Total: $${(p.total || 0).toFixed(2)}</p>
                 </div>
                 <button data-id="${p.id}" class="view-details-btn bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-2 px-4 rounded-lg">Ver Detalles</button>
             `;
@@ -872,7 +881,7 @@ const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2
                     <h3 class="font-bold mb-2">Detalles Generales</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm bg-slate-50 p-4 rounded-lg">
                         <p><strong class="font-medium text-slate-500">Proveedor:</strong><br><span class="copy-btn cursor-pointer" data-copy="${data.proveedor}" title="Copiar">${data.proveedor}</span></p>
-                        <p><strong class="font-medium text-slate-500">Fecha:</strong><br><span class="copy-btn cursor-pointer" data-copy="${data.fecha}" title="Copiar">${data.fecha}</span></p>
+                        <p><strong class="font-medium text-slate-500">Fecha:</strong><br><span class="copy-btn cursor-pointer" data-copy="${formatDateDDMMYYYY(data.fecha)}" title="Copiar">${formatDateDDMMYYYY(data.fecha)}</span></p>
                         <p><strong class="font-medium text-slate-500">No. Factura:</strong><br><span class="copy-btn cursor-pointer" data-copy="${data.numero_factura || 'No especificado'}" title="Copiar">${data.numero_factura || 'No especificado'}</span></p>
                     </div>
                 </div>
