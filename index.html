@@ -716,12 +716,12 @@
                                 <td>
                                   <div class="font-medium">${item.desc_catalogo || item.descripcion_factura}</div>
                                   <div class="text-xs text-slate-500">
-                                    ${item.clave_catalogo ? `<span class="copy-clave-btn cursor-pointer" data-clave="${item.clave_catalogo}" title="Copiar clave">${item.clave_catalogo}</span>` : 'Sin vincular'}
+                                    ${item.clave_catalogo ? `<span class="copy-clave-btn copy-btn cursor-pointer" data-copy="${item.clave_catalogo}" data-clave="${item.clave_catalogo}" title="Copiar clave">${item.clave_catalogo}</span>` : 'Sin vincular'}
                                   </div>
                                 </td>
-                                <td>${item.cantidad_factura}</td>
+                                <td><span class="copy-btn cursor-pointer" data-copy="${item.cantidad_factura}" title="Copiar">${item.cantidad_factura}</span></td>
                                 <td>${item.unidades_por_paquete}</td>
-                                <td>$${(item.precio_final || 0).toFixed(2)}</td>
+                                <td><span class="copy-btn cursor-pointer" data-copy="${(item.precio_final || 0).toFixed(2)}" title="Copiar">$${(item.precio_final || 0).toFixed(2)}</span></td>
                                 <td class="font-semibold">$${(item.total_linea_final || 0).toFixed(2)}</td>
                             </tr>
                         `).join('')}
@@ -731,22 +731,22 @@
         }
 
         return `
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="space-y-6">
                 <div>
                     <h3 class="font-bold mb-2">Detalles Generales</h3>
-                    <div class="grid grid-cols-2 gap-4 mb-6 text-sm bg-slate-50 p-4 rounded-lg">
-                        <p><strong class="font-medium text-slate-500">Proveedor:</strong><br>${data.proveedor}</p>
-                        <p><strong class="font-medium text-slate-500">No. Factura:</strong><br>${data.numero_factura || 'No especificado'}</p>
-                        <p><strong class="font-medium text-slate-500">Fecha:</strong><br>${data.fecha}</p>
-                        <p><strong class="font-medium text-slate-500">Total Factura:</strong><br>$${(data.total || 0).toFixed(2)}</p>
-                        <p><strong class="font-medium text-slate-500">Sucursal:</strong><br>${data.sucursal}</p>
-                        <p><strong class="font-medium text-slate-500">Transporte:</strong><br>${data.transporte}</p>
-                        <p><strong class="font-medium text-slate-500">IVA Aplicado:</strong><br>${data.iva_aplicado || 0}%</p>
-                        <p><strong class="font-medium text-slate-500">Tipo de Cambio:</strong><br>${data.tipo_cambio_aplicado || 1}</p>
-                        <p class="col-span-2"><strong class="font-medium text-slate-500">Faltantes:</strong><br>${data.faltantes}</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm bg-slate-50 p-4 rounded-lg">
+                        <p><strong class="font-medium text-slate-500">Proveedor:</strong><br><span class="copy-btn cursor-pointer" data-copy="${data.proveedor}" title="Copiar">${data.proveedor}</span></p>
+                        <p><strong class="font-medium text-slate-500">Fecha:</strong><br><span class="copy-btn cursor-pointer" data-copy="${data.fecha}" title="Copiar">${data.fecha}</span></p>
+                        <p><strong class="font-medium text-slate-500">No. Factura:</strong><br><span class="copy-btn cursor-pointer" data-copy="${data.numero_factura || 'No especificado'}" title="Copiar">${data.numero_factura || 'No especificado'}</span></p>
                     </div>
+                </div>
+                <div>
+                    <h3 class="font-bold mb-2">Artículos de la Factura</h3>
+                    <div class="bg-slate-50 p-4 rounded-lg mb-4">${itemsHTML}</div>
+                </div>
+                <div>
                     <h3 class="font-bold mb-2">Imágenes Adjuntas</h3>
-                    <div class="p-4 bg-slate-50 rounded-lg mb-6">${imagesHTML}</div>
+                    <div class="p-4 bg-slate-50 rounded-lg mb-4">${imagesHTML}</div>
                     <label for="add-image-input" class="mt-4 inline-block cursor-pointer bg-blue-100 text-blue-800 hover:bg-blue-200 text-sm font-medium py-2 px-4 rounded-lg">
                         <span class="material-icons text-base align-middle mr-1">add_photo_alternate</span>
                         Añadir otra imagen
@@ -754,8 +754,6 @@
                     <input type="file" id="add-image-input" class="hidden" accept="image/*">
                 </div>
                 <div>
-                    <h3 class="font-bold mb-2">Artículos de la Factura</h3>
-                    <div class="bg-slate-50 p-4 rounded-lg mb-6">${itemsHTML}</div>
                     <h3 class="font-bold mb-2">Comentarios</h3>
                     <div class="space-y-3 mb-4">${commentsHTML}</div>
                     <form id="add-comment-form">
@@ -866,18 +864,30 @@
         }
     }
 
+    function handleCopyText(target) {
+        const text = target.dataset.copy;
+        if (text) {
+            navigator.clipboard.writeText(text);
+            showToast('Copiado.', 'success');
+        }
+    }
+
     document.addEventListener('click', (e) => {
         if (e.target.closest('.view-details-btn')) {
             const id = e.target.closest('.view-details-btn').dataset.id;
             showDetails(id);
         } else if (e.target.closest('.copy-clave-btn')) {
             handleCopyClave(e.target.closest('.copy-clave-btn'));
+        } else if (e.target.closest('.copy-btn')) {
+            handleCopyText(e.target.closest('.copy-btn'));
         }
     });
 
     document.addEventListener('dblclick', (e) => {
         if (e.target.closest('.copy-clave-btn')) {
             handleCopyClave(e.target.closest('.copy-clave-btn'));
+        } else if (e.target.closest('.copy-btn')) {
+            handleCopyText(e.target.closest('.copy-btn'));
         }
     });
 
