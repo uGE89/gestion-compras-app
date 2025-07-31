@@ -144,6 +144,13 @@
 
     // --- LÓGICA DE LA APLICACIÓN ---
 
+    // Utilidad para escapar valores dinámicos antes de insertarlos en el DOM
+    function escapeHTML(str) {
+        const div = document.createElement('div');
+        div.textContent = str == null ? '' : String(str);
+        return div.innerHTML;
+    }
+
     function showRegisterForm() {
         registerSection.innerHTML = getRegisterFormHTML();
         registerSection.classList.remove('hidden');
@@ -635,7 +642,7 @@
     }
 
     // Funciones de historial y detalles (sin cambios funcionales)
-     function listenToPurchases() {
+    function listenToPurchases() {
         const q = query(purchasesCollection, orderBy("createdAt", "desc"));
         onSnapshot(q, (snapshot) => {
             historyLoader.classList.add('hidden');
@@ -644,17 +651,35 @@
                 return;
             }
             historyList.innerHTML = '';
-            snapshot.forEach(doc => {
-                const purchase = doc.data();
+            snapshot.forEach(docSnap => {
+                const purchase = docSnap.data();
                 const card = document.createElement('div');
                 card.className = 'border border-slate-200 p-4 rounded-lg flex justify-between items-center hover:bg-slate-50 transition-colors';
-                card.innerHTML = `
-                    <div>
-                        <p class="font-bold text-lg text-slate-800">${purchase.proveedor} <span class="font-normal text-base text-slate-500">#${purchase.numero_factura || 'N/A'}</span></p>
-                        <p class="text-sm text-slate-500">Fecha: ${purchase.fecha} | Total: $${(purchase.total || 0).toFixed(2)}</p>
-                    </div>
-                    <button data-id="${doc.id}" class="view-details-btn bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-2 px-4 rounded-lg">Ver Detalles</button>
-                `;
+
+                const infoDiv = document.createElement('div');
+                const titleP = document.createElement('p');
+                titleP.className = 'font-bold text-lg text-slate-800';
+                titleP.textContent = purchase.proveedor + ' ';
+                const factSpan = document.createElement('span');
+                factSpan.className = 'font-normal text-base text-slate-500';
+                factSpan.textContent = '#' + (purchase.numero_factura || 'N/A');
+                titleP.appendChild(factSpan);
+
+                const dateP = document.createElement('p');
+                dateP.className = 'text-sm text-slate-500';
+                dateP.textContent = `Fecha: ${purchase.fecha} | Total: $${(purchase.total || 0).toFixed(2)}`;
+
+                infoDiv.appendChild(titleP);
+                infoDiv.appendChild(dateP);
+
+                const button = document.createElement('button');
+                button.className = 'view-details-btn bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-2 px-4 rounded-lg';
+                button.textContent = 'Ver Detalles';
+                button.dataset.id = docSnap.id;
+
+                card.appendChild(infoDiv);
+                card.appendChild(button);
+
                 historyList.appendChild(card);
             });
         });
@@ -685,8 +710,16 @@
     }
 
     function generateModalContent(docId, data) {
-        const imagesHTML = (data.images || []).map(imgSrc => `<a href="${imgSrc}" target="_blank"><img src="${imgSrc}" class="w-full h-auto max-h-80 object-contain rounded-lg border mb-2"></a>`).join('');
-        const commentsHTML = (data.comments || []).map(comment => `<div class="bg-slate-100 p-3 rounded-lg"><p class="text-sm">${comment.text}</p><p class="text-xs text-right text-slate-400 mt-1">${new Date(comment.createdAt.toDate()).toLocaleString()}</p></div>`).join('<div class="my-2"></div>') || '<p class="text-sm text-slate-400">No hay comentarios.</p>';
+        const imagesHTML = (data.images || []).map(imgSrc => {
+            const safeSrc = escapeHTML(imgSrc);
+            return `<a href="${safeSrc}" target="_blank"><img src="${safeSrc}" class="w-full h-auto max-h-80 object-contain rounded-lg border mb-2"></a>`;
+        }).join('');
+
+        const commentsHTML = (data.comments || []).map(comment => {
+            const text = escapeHTML(comment.text);
+            const dateStr = new Date(comment.createdAt.toDate()).toLocaleString();
+            return `<div class="bg-slate-100 p-3 rounded-lg"><p class="text-sm">${text}</p><p class="text-xs text-right text-slate-400 mt-1">${dateStr}</p></div>`;
+        }).join('<div class="my-2"></div>') || '<p class="text-sm text-slate-400">No hay comentarios.</p>';
 
         let itemsHTML = '<p class="text-sm text-slate-400">No se registraron artículos para esta compra.</p>';
         if (data.items && data.items.length > 0) {
@@ -703,21 +736,25 @@
                         </tr>
                     </thead>
                     <tbody>
-                        ${data.items.map((item, index) => `
+                        ${data.items.map((item, index) => {
+                            const desc = escapeHTML(item.desc_catalogo || item.descripcion_factura);
+                            const clave = item.clave_catalogo ? escapeHTML(item.clave_catalogo) : null;
+                            return `
                             <tr class="border-b border-slate-100">
                                 <td><input type="checkbox" data-index="${index}" class="item-received-checkbox" ${item.recibido ? 'checked' : ''}></td>
                                 <td>
-                                  <div class="font-medium">${item.desc_catalogo || item.descripcion_factura}</div>
+                                  <div class="font-medium">${desc}</div>
                                   <div class="text-xs text-slate-500">
-                                    ${item.clave_catalogo ? `<span class="copy-clave-btn cursor-pointer" data-clave="${item.clave_catalogo}" title="Copiar clave">${item.clave_catalogo}</span>` : 'Sin vincular'}
+                                    ${clave ? `<span class="copy-clave-btn cursor-pointer" data-clave="${clave}" title="Copiar clave">${clave}</span>` : 'Sin vincular'}
                                   </div>
                                 </td>
-                                <td>${item.cantidad_factura}</td>
-                                <td>${item.unidades_por_paquete}</td>
+                                <td>${escapeHTML(item.cantidad_factura)}</td>
+                                <td>${escapeHTML(item.unidades_por_paquete)}</td>
                                 <td>$${(item.precio_final || 0).toFixed(2)}</td>
                                 <td class="font-semibold">$${(item.total_linea_final || 0).toFixed(2)}</td>
                             </tr>
-                        `).join('')}
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             `;
@@ -728,15 +765,15 @@
                 <div>
                     <h3 class="font-bold mb-2">Detalles Generales</h3>
                     <div class="grid grid-cols-2 gap-4 mb-6 text-sm bg-slate-50 p-4 rounded-lg">
-                        <p><strong class="font-medium text-slate-500">Proveedor:</strong><br>${data.proveedor}</p>
-                        <p><strong class="font-medium text-slate-500">No. Factura:</strong><br>${data.numero_factura || 'No especificado'}</p>
-                        <p><strong class="font-medium text-slate-500">Fecha:</strong><br>${data.fecha}</p>
+                        <p><strong class="font-medium text-slate-500">Proveedor:</strong><br>${escapeHTML(data.proveedor)}</p>
+                        <p><strong class="font-medium text-slate-500">No. Factura:</strong><br>${escapeHTML(data.numero_factura || 'No especificado')}</p>
+                        <p><strong class="font-medium text-slate-500">Fecha:</strong><br>${escapeHTML(data.fecha)}</p>
                         <p><strong class="font-medium text-slate-500">Total Factura:</strong><br>$${(data.total || 0).toFixed(2)}</p>
-                        <p><strong class="font-medium text-slate-500">Sucursal:</strong><br>${data.sucursal}</p>
-                        <p><strong class="font-medium text-slate-500">Transporte:</strong><br>${data.transporte}</p>
-                        <p><strong class="font-medium text-slate-500">IVA Aplicado:</strong><br>${data.iva_aplicado || 0}%</p>
-                        <p><strong class="font-medium text-slate-500">Tipo de Cambio:</strong><br>${data.tipo_cambio_aplicado || 1}</p>
-                        <p class="col-span-2"><strong class="font-medium text-slate-500">Faltantes:</strong><br>${data.faltantes}</p>
+                        <p><strong class="font-medium text-slate-500">Sucursal:</strong><br>${escapeHTML(data.sucursal)}</p>
+                        <p><strong class="font-medium text-slate-500">Transporte:</strong><br>${escapeHTML(data.transporte)}</p>
+                        <p><strong class="font-medium text-slate-500">IVA Aplicado:</strong><br>${escapeHTML(data.iva_aplicado || 0)}%</p>
+                        <p><strong class="font-medium text-slate-500">Tipo de Cambio:</strong><br>${escapeHTML(data.tipo_cambio_aplicado || 1)}</p>
+                        <p class="col-span-2"><strong class="font-medium text-slate-500">Faltantes:</strong><br>${escapeHTML(data.faltantes)}</p>
                     </div>
                     <h3 class="font-bold mb-2">Imágenes Adjuntas</h3>
                     <div class="p-4 bg-slate-50 rounded-lg mb-6">${imagesHTML}</div>
