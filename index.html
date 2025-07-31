@@ -155,6 +155,7 @@
     let totalFacturaAI = 0;
     let imageUrls = [];
     let productCatalog = [];
+    let isCatalogReady = false;
     let allPurchases = [];
 
     // --- ELEMENTOS DEL DOM ---
@@ -209,6 +210,7 @@
             const result = await response.json();
             if (result.success) {
                 productCatalog = result.data;
+                isCatalogReady = true;
             } else {
                 throw new Error(result.error);
             }
@@ -527,6 +529,10 @@
 
     // Funciones de búsqueda y modal
     async function openSearchModal(index) {
+        if (!isCatalogReady) {
+            showToast('El catálogo aún está cargando, por favor espera', 'error');
+            return;
+        }
         const item = extractedItems[index];
         modalTitle.textContent = 'Buscar Producto en Catálogo';
         modalContainer.classList.remove('max-w-4xl');
