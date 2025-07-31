@@ -100,7 +100,7 @@
     // Importaciones de Firebase
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, arrayUnion, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { initializeFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, arrayUnion, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
     // --- CONFIGURACIÓN DE FIREBASE ---
@@ -121,7 +121,10 @@
     // --- INICIALIZACIÓN DE FIREBASE ---
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = initializeFirestore(app, {
+        experimentalForceLongPolling: true,
+        useFetchStreams: false,
+    });
     const storage = getStorage(app);
     const purchasesCollection = collection(db, `artifacts/${appId}/public/data/compras`);
 
