@@ -157,6 +157,7 @@
     let productCatalog = [];
     let isCatalogReady = false;
     let allPurchases = [];
+    let currentEditId = null;
 
     // --- ELEMENTOS DEL DOM ---
     const showRegisterFormBtn = document.getElementById('show-register-form-btn');
@@ -188,6 +189,7 @@
     // --- LÓGICA DE LA APLICACIÓN ---
 
     function showRegisterForm() {
+        currentEditId = null;
         registerSection.innerHTML = getRegisterFormHTML();
         registerSection.classList.remove('hidden');
         showRegisterFormBtn.classList.add('hidden');
@@ -205,6 +207,42 @@
         registerSection.classList.add('hidden');
         registerSection.innerHTML = '';
         showRegisterFormBtn.classList.remove('hidden');
+        currentEditId = null;
+    }
+
+    function showEditForm(docId) {
+        const data = allPurchases.find(p => p.id === docId);
+        if (!data) return;
+        currentEditId = docId;
+        registerSection.innerHTML = getRegisterFormHTML(data, true);
+        registerSection.classList.remove('hidden');
+        showRegisterFormBtn.classList.add('hidden');
+
+        const form = document.getElementById('purchase-form');
+        document.getElementById('calculation-section').classList.remove('hidden');
+
+        extractedItems = (data.items || []).map(it => ({
+            descripcion: it.descripcion_factura,
+            cantidad: it.cantidad_factura,
+            unidades_por_paquete: it.unidades_por_paquete,
+            total_linea: it.total_linea_base,
+            clave_catalogo: it.clave_catalogo,
+            desc_catalogo: it.desc_catalogo
+        }));
+        imageUrls = data.images || [];
+        totalFacturaAI = data.total || 0;
+
+        displayCalculationUI();
+        document.getElementById('iva').value = data.iva_aplicado ?? 15;
+        document.getElementById('tipo-cambio').value = data.tipo_cambio_aplicado ?? 1;
+        renderItemsTable();
+
+        form.addEventListener('submit', (e) => handleFormSubmit(e, docId));
+        document.getElementById('register-section').addEventListener('click', (e) => {
+            if (e.target.id === 'cancel-register-btn') {
+                hideRegisterForm();
+            }
+        });
     }
 
     async function loadProductCatalog() {
@@ -242,12 +280,10 @@ console.table(productCatalog.slice(0, 5));
         }
     }
 
-    function getRegisterFormHTML(data = {}) {
-        return `
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold">Nuevo Registro</h2>
-                <button id="cancel-register-btn" class="text-slate-500 hover:text-slate-800">Cancelar</button>
-            </div>
+    function getRegisterFormHTML(data = {}, isEdit = false) {
+        const title = isEdit ? 'Editar Registro' : 'Nuevo Registro';
+        const formHidden = isEdit ? '' : 'hidden';
+        const step1 = `
              <div id="step1-upload">
                  <div class="text-center p-6 border-2 border-dashed border-slate-300 rounded-lg">
                      <label for="file-upload" class="cursor-pointer text-emerald-600 font-medium">
@@ -262,21 +298,28 @@ console.table(productCatalog.slice(0, 5));
                      <div class="spinner w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full mr-3"></div>
                      <span id="ai-loader-text">Analizando factura con IA...</span>
                  </div>
-             </div>
-             <form id="purchase-form" class="hidden mt-6">
-                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <div><label for="fecha" class="block text-sm font-medium text-slate-700">Fecha</label><input type="date" id="fecha" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
-                     <div><label for="numero_factura" class="block text-sm font-medium text-slate-700">No. Factura</label><input type="text" id="numero_factura" placeholder="Número de la factura" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
-                     <div><label for="proveedor" class="block text-sm font-medium text-slate-700">Proveedor</label><input type="text" id="proveedor" placeholder="Nombre del proveedor" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
-                     <div><label for="total" class="block text-sm font-medium text-slate-700">Monto Total (Factura)</label><input type="number" id="total" step="0.01" placeholder="0.00" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2 bg-slate-100" readonly></div>
-                     <div><label for="sucursal" class="block text-sm font-medium text-slate-700">Sucursal</label><input type="text" id="sucursal" placeholder="Sucursal que recibe" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
-                     <div><label for="transporte" class="block text-sm font-medium text-slate-700">Transporte</label><input type="text" id="transporte" placeholder="Transporte utilizado" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
-                     <div class="md:col-span-2"><label for="faltantes" class="block text-sm font-medium text-slate-700">Faltantes o Comentarios Adicionales</label><input type="text" id="faltantes" value="Ninguno" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
-                 </div>
-                 <div id="calculation-section" class="mt-8 hidden"></div>
-                 <div class="mt-8 text-right"><button type="submit" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-lg shadow-md">Guardar Registro</button></div>
-             </form>
-          `;
+             </div>`;
+
+        return `
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">${title}</h2>
+                <button id="cancel-register-btn" class="text-slate-500 hover:text-slate-800">Cancelar</button>
+            </div>
+            ${isEdit ? '' : step1}
+            <form id="purchase-form" class="${formHidden} mt-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div><label for="fecha" class="block text-sm font-medium text-slate-700">Fecha</label><input type="date" id="fecha" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2" value="${data.fecha || ''}"></div>
+                    <div><label for="numero_factura" class="block text-sm font-medium text-slate-700">No. Factura</label><input type="text" id="numero_factura" placeholder="Número de la factura" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2" value="${data.numero_factura || ''}"></div>
+                    <div><label for="proveedor" class="block text-sm font-medium text-slate-700">Proveedor</label><input type="text" id="proveedor" placeholder="Nombre del proveedor" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2" value="${data.proveedor || ''}"></div>
+                    <div><label for="total" class="block text-sm font-medium text-slate-700">Monto Total (Factura)</label><input type="number" id="total" step="0.01" placeholder="0.00" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2 bg-slate-100" readonly value="${data.total || 0}"></div>
+                    <div><label for="sucursal" class="block text-sm font-medium text-slate-700">Sucursal</label><input type="text" id="sucursal" placeholder="Sucursal que recibe" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2" value="${data.sucursal || ''}"></div>
+                    <div><label for="transporte" class="block text-sm font-medium text-slate-700">Transporte</label><input type="text" id="transporte" placeholder="Transporte utilizado" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2" value="${data.transporte || ''}"></div>
+                    <div class="md:col-span-2"><label for="faltantes" class="block text-sm font-medium text-slate-700">Faltantes o Comentarios Adicionales</label><input type="text" id="faltantes" value="${data.faltantes || 'Ninguno'}" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
+                </div>
+                <div id="calculation-section" class="mt-8 hidden"></div>
+                <div class="mt-8 text-right"><button type="submit" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-lg shadow-md">Guardar Registro</button></div>
+            </form>
+         `;
     }
     
     async function handleFileSelect(e) {
@@ -648,13 +691,13 @@ const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2
         });
     }
     
-    async function handleFormSubmit(e) {
+    async function handleFormSubmit(e, docId = null) {
         e.preventDefault();
         const submitButton = e.target.querySelector('button[type="submit"]');
         submitButton.disabled = true;
         submitButton.innerHTML = `<div class="spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full mx-auto"></div>`;
-        
-        if (imageUrls.length === 0) {
+
+        if (!docId && imageUrls.length === 0) {
             showToast('Por favor, sube al menos una imagen de la factura.', 'error');
             submitButton.disabled = false;
             submitButton.textContent = 'Guardar Registro';
@@ -665,7 +708,7 @@ const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2
         const proveedor = form.proveedor.value.trim();
         const numeroFactura = form.numero_factura.value.trim();
 
-        if (proveedor && numeroFactura) {
+        if (!docId && proveedor && numeroFactura) {
             const q = query(purchasesCollection, where("proveedor", "==", proveedor), where("numero_factura", "==", numeroFactura));
             const querySnapshot = await getDocs(q);
             if (!querySnapshot.empty) {
@@ -708,17 +751,26 @@ const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2
             transporte: form.transporte.value,
             faltantes: form.faltantes.value,
             images: imageUrls,
-            comments: [],
             items: finalItems,
             iva_aplicado: ivaPercent,
-            tipo_cambio_aplicado: tipoCambio,
-            createdAt: new Date(),
-            createdBy: userId,
+            tipo_cambio_aplicado: tipoCambio
         };
+        if (!docId) {
+            purchaseData.comments = [];
+            purchaseData.createdAt = new Date();
+            purchaseData.createdBy = userId;
+            purchaseData.agregado_sicar = false;
+        }
 
         try {
-            await addDoc(purchasesCollection, purchaseData);
-            showToast('Compra registrada con éxito.', 'success');
+            if (docId) {
+                const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
+                await updateDoc(docRef, purchaseData);
+                showToast('Registro actualizado con éxito.', 'success');
+            } else {
+                await addDoc(purchasesCollection, purchaseData);
+                showToast('Compra registrada con éxito.', 'success');
+            }
             hideRegisterForm();
             form.reset();
             imageUrls = [];
@@ -801,12 +853,16 @@ const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2
         list.forEach(p => {
             const card = document.createElement('div');
             card.className = 'border border-slate-200 p-4 rounded-lg flex justify-between items-center hover:bg-slate-50 transition-colors';
+            if (p.agregado_sicar) card.classList.add('bg-blue-100');
             card.innerHTML = `
                 <div>
                     <p class="font-bold text-lg text-slate-800">${p.proveedor} <span class="font-normal text-base text-slate-500">#${p.numero_factura || 'N/A'}</span></p>
                     <p class="text-sm text-slate-500">Fecha: ${formatDateDDMMYYYY(p.fecha)} | Total: $${(p.total || 0).toFixed(2)}</p>
                 </div>
-                <button data-id="${p.id}" class="view-details-btn bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-2 px-4 rounded-lg">Ver Detalles</button>
+                <div class="space-x-2">
+                    <button data-id="${p.id}" class="edit-btn bg-amber-500 hover:bg-amber-600 text-white font-medium py-2 px-3 rounded-lg">Editar</button>
+                    <button data-id="${p.id}" class="view-details-btn bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-2 px-4 rounded-lg">Ver Detalles</button>
+                </div>
             `;
             historyList.appendChild(card);
         });
@@ -827,6 +883,14 @@ const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2
                 document.getElementById('add-image-input').addEventListener('change', (e) => handleAddNewImage(e, docId));
                 document.querySelectorAll('.item-received-checkbox').forEach(checkbox => {
                     checkbox.addEventListener('change', (e) => handleItemReceivedToggle(e, docId));
+                });
+                document.getElementById('edit-record-btn').addEventListener('click', () => {
+                    detailsModal.classList.add('hidden');
+                    showEditForm(docId);
+                });
+                document.getElementById('toggle-sicar-btn').addEventListener('click', (e) => {
+                    const current = e.target.dataset.agregado === 'true';
+                    toggleAgregadoSicar(docId, current);
                 });
             } else {
                 showToast('No se encontró el registro.', 'error');
@@ -877,6 +941,10 @@ const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2
 
         return `
             <div class="space-y-6">
+                <div class="flex justify-end space-x-2">
+                    <button id="edit-record-btn" class="bg-amber-500 hover:bg-amber-600 text-white font-medium py-2 px-4 rounded-lg" data-id="${docId}">Editar</button>
+                    <button id="toggle-sicar-btn" data-agregado="${data.agregado_sicar ? 'true' : 'false'}" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg">${data.agregado_sicar ? 'Quitar de Sicar' : 'Marcar Agregado en Sicar'}</button>
+                </div>
                 <div>
                     <h3 class="font-bold mb-2">Detalles Generales</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm bg-slate-50 p-4 rounded-lg">
@@ -965,6 +1033,16 @@ const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2
         }
     }
 
+    async function toggleAgregadoSicar(docId, current) {
+        const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
+        try {
+            await updateDoc(docRef, { agregado_sicar: !current });
+            showToast('Estado actualizado.', 'success');
+        } catch (error) {
+            showToast(`Error al actualizar: ${error.message}`, 'error');
+        }
+    }
+
     function showToast(message, type = 'success') {
         const toast = document.createElement('div');
         const bgColor = type === 'success' ? 'bg-emerald-500' : 'bg-red-500';
@@ -1030,6 +1108,9 @@ const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2
         if (e.target.closest('.view-details-btn')) {
             const id = e.target.closest('.view-details-btn').dataset.id;
             showDetails(id);
+        } else if (e.target.closest('.edit-btn')) {
+            const id = e.target.closest('.edit-btn').dataset.id;
+            showEditForm(id);
         } else if (e.target.closest('.copy-clave-btn')) {
             handleCopyClave(e.target.closest('.copy-clave-btn'));
         } else if (e.target.closest('.copy-btn')) {
