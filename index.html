@@ -188,12 +188,13 @@
 
     // --- LÓGICA DE LA APLICACIÓN ---
 
-    function showRegisterForm() {
+    async function showRegisterForm() {
         currentEditId = null;
         registerSection.innerHTML = getRegisterFormHTML();
-        registerSection.classList.remove('hidden');
         showRegisterFormBtn.classList.add('hidden');
-        
+        await Promise.all([loadContacts(), loadCategories()]);
+        registerSection.classList.remove('hidden');
+
         document.getElementById('purchase-form').addEventListener('submit', handleFormSubmit);
         document.getElementById('file-upload').addEventListener('change', handleFileSelect);
         document.getElementById('register-section').addEventListener('click', (e) => {
@@ -280,6 +281,44 @@ console.table(productCatalog.slice(0, 5));
         }
     }
 
+    async function loadContacts() {
+        const contactSelect = document.getElementById('contact-select');
+        if (!contactSelect) return;
+        contactSelect.innerHTML = '<option value="">Seleccionar Contacto</option>';
+        try {
+            const contactsRef = collection(db, `artifacts/${appId}/public/data/contactos`);
+            const snapshot = await getDocs(contactsRef);
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const option = document.createElement('option');
+                option.value = doc.id;
+                option.textContent = data.nombre || doc.id;
+                contactSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error al cargar contactos:', error);
+        }
+    }
+
+    async function loadCategories() {
+        const categorySelect = document.getElementById('category-select');
+        if (!categorySelect) return;
+        categorySelect.innerHTML = '<option value="">Seleccionar Categoría</option>';
+        try {
+            const categoriesRef = collection(db, `artifacts/${appId}/public/data/categorias`);
+            const snapshot = await getDocs(categoriesRef);
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const option = document.createElement('option');
+                option.value = doc.id;
+                option.textContent = data.nombre || doc.id;
+                categorySelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error al cargar categorías:', error);
+        }
+    }
+
     function getRegisterFormHTML(data = {}, isEdit = false) {
         const title = isEdit ? 'Editar Registro' : 'Nuevo Registro';
         const formHidden = isEdit ? '' : 'hidden';
@@ -311,6 +350,8 @@ console.table(productCatalog.slice(0, 5));
                     <div><label for="fecha" class="block text-sm font-medium text-slate-700">Fecha</label><input type="date" id="fecha" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2" value="${data.fecha || ''}"></div>
                     <div><label for="numero_factura" class="block text-sm font-medium text-slate-700">No. Factura</label><input type="text" id="numero_factura" placeholder="Número de la factura" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2" value="${data.numero_factura || ''}"></div>
                     <div><label for="proveedor" class="block text-sm font-medium text-slate-700">Proveedor</label><input type="text" id="proveedor" placeholder="Nombre del proveedor" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2" value="${data.proveedor || ''}"></div>
+                    <div><label for="contact-select" class="block text-sm font-medium text-slate-700">Contacto</label><select id="contact-select" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"><option value="">Seleccionar Contacto</option></select></div>
+                    <div><label for="category-select" class="block text-sm font-medium text-slate-700">Categoría</label><select id="category-select" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"><option value="">Seleccionar Categoría</option></select></div>
                     <div><label for="total" class="block text-sm font-medium text-slate-700">Monto Total (Factura)</label><input type="number" id="total" step="0.01" placeholder="0.00" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2 bg-slate-100" readonly value="${data.total || 0}"></div>
                     <div><label for="sucursal" class="block text-sm font-medium text-slate-700">Sucursal</label><input type="text" id="sucursal" placeholder="Sucursal que recibe" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2" value="${data.sucursal || ''}"></div>
                     <div><label for="transporte" class="block text-sm font-medium text-slate-700">Transporte</label><input type="text" id="transporte" placeholder="Transporte utilizado" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2" value="${data.transporte || ''}"></div>
