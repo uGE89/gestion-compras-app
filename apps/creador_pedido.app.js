@@ -5,9 +5,14 @@ export default {
   async mount(container, { appState, auth, db }) {
     // ===== Espera segura y acceso a los datos =====
     if (!appState?.isCatalogReady) {
-      console.error("Catálogo no listo. La app de pedidos no puede inicializarse.");
       container.innerHTML = `<div class="p-10 text-center text-gray-500">Cargando datos...</div>`;
-      return;
+      for (let i = 0; i < 150 && !appState.isCatalogReady; i++) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+      if (!appState.isCatalogReady) {
+        console.error("Catálogo no listo. La app de pedidos no puede inicializarse.");
+        return;
+      }
     }
 
     const productCatalog = appState.productCatalog;

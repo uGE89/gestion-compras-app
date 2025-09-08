@@ -15,7 +15,10 @@ export default {
 
     if (!appState?.isCatalogReady) {
       container.innerHTML = `<div class="p-10 text-center text-gray-500">Cargando datos...</div>`;
-      return;
+      for (let i = 0; i < 150 && !appState.isCatalogReady; i++) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+      if (!appState.isCatalogReady) return;
     }
 
     const product = appState.productCatalog.find(p => p.id === productId);
