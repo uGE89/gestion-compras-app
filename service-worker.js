@@ -1,0 +1,110 @@
+// service-worker.js
+// ⇨ Cambiá este número en cada deploy para invalidar caché viejo.
+const APP_VERSION = '2025.09.07-5';
+const PREFIX     = 'gestion-compras-cache-';
+const CACHE_NAME = `${PREFIX}${APP_VERSION}`;
+
+// Lista de archivos del "App Shell" (corrige coma y nombre del loader)
+const URLS_TO_CACHE = [
+  '/',
+  '/index.html',
+  '/login.html',
+  '/compras.html',
+  '/app_extraccion.html',
+  '/app_pedidos_movil.html',
+  '/app_historial_transferencias.html',
+  '/analizador_cotizaciones.html',
+  '/state.js',
+  '/app_loader.js',     // ← corregido (guion_bajo)
+  '/firebase-init.js',
+  // Agregá aquí CSS locales si los tenés
+];
+
+// -------- Estrategias --------
+async function networkFirst(req, fallbackUrl) {
+  try {
+    const fresh = await fetch(req, { cache: 'no-store' });
+    if (fresh && fresh.ok && new URL(req.url).origin === self.location.origin) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(req, fresh.clone());
+    }
+    return fresh;
+  } catch (err) {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(req);
+    if (cached) return cached;
+    if (fallbackUrl) {
+      const fallback = await cache.match(fallbackUrl);
+      if (fallback) return fallback;
+    }
+    throw err;
+  }
+}
+
+async function cacheFirst(req) {
+  const cached = await caches.match(req);
+  if (cached) return cached;
+  const fresh = await fetch(req);
+  if (fresh && fresh.ok && new URL(req.url).origin === self.location.origin) {
+    const cache = await caches.open(CACHE_NAME);
+    cache.put(req, fresh.clone());
+  }
+  return fresh;
+}
+
+// -------- Ciclo de vida --------
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(URLS_TO_CACHE))
+  );
+  self.skipWaiting(); // activar de una
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys.map((k) => (k.startsWith(PREFIX) && k !== CACHE_NAME) ? caches.delete(k) : null)
+    );
+    await self.clients.claim(); // tomar control inmediato
+  })());
+});
+
+// -------- Interceptor --------
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  const url = new URL(req.url);
+  const accept = req.headers.get('accept') || '';
+
+  // 1) No interceptar nada que no sea GET (deja pasar POST: BigQuery)
+  if (req.method !== 'GET') {
+    event.respondWith(fetch(req));
+    return;
+  }
+
+  // 2) No interceptar orígenes externos (CDNs, Google APIs, etc.)
+  if (url.origin !== self.location.origin) {
+    event.respondWith(fetch(req));
+    return;
+  }
+
+  // 3) HTML (navegación o fetch de subpáginas) → network-first (fallback index)
+  if (req.mode === 'navigate' || req.destination === 'document' || accept.includes('text/html')) {
+    event.respondWith(networkFirst(req, '/index.html'));
+    return;
+  }
+
+  // 4) JS/CSS/Workers → network-first (siempre lo más nuevo)
+  if (req.destination === 'script' || req.destination === 'style' || req.destination === 'worker') {
+    event.respondWith(networkFirst(req));
+    return;
+  }
+
+  // 5) Imágenes/fuentes/etc. → cache-first (rendimiento)
+  event.respondWith(cacheFirst(req));
+});
+
+// (Opcional) para flujos de “Aplicar actualización” desde la app
+self.addEventListener('message', (e) => {
+  if (e.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
