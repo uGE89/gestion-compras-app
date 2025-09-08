@@ -3,1165 +3,384 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Compras con IA</title>
+    <title>Dashboard de Gestión</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .hidden { display: none; }
-        .modal-overlay {
-            transition: opacity 0.3s ease;
-        }
-        .modal-container {
-            transition: transform 0.3s ease;
+        body { font-family: 'Inter', sans-serif; }
+        .nav-link.active {
+            background-color: #10b981; /* emerald-500 */
+            color: white;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .spinner { animation: spin 1s linear infinite; }
-        .toast {
-            transition: transform 0.3s ease, opacity 0.3s ease;
-        }
-        /* Estilo para la tabla de items */
-        .item-table th, .item-table td {
-            padding: 8px 12px;
-            text-align: left;
-            vertical-align: middle;
-        }
-        .item-table tbody tr:nth-child(odd) {
-            background-color: #f9fafb; /* bg-slate-50 */
-        }
-        .item-table input[type="number"], .item-table input[type="text"] {
-            width: 100%;
-            padding: 4px 8px;
-            border-radius: 6px;
-            border: 1px solid #cbd5e1; /* border-slate-300 */
-        }
+        .spinner { animation: spin 1s linear infinite; border-top-color: transparent; }
+        .nav-menu-mobile { display: none; }
+        .nav-menu-mobile.active { display: flex; }
+        /* --- Visuales nuevos, sin tocar la lógica --- */
+        .module-header { position: sticky; top: 0; z-index: 30; backdrop-filter: saturate(180%) blur(6px); }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; }
+        /* Oculta el botón hamburguesa y el menú superior en móvil */
+@media (max-width: 767px) {
+  #menu-toggle-btn { display: none !important; }
+  .nav-menu-mobile { display: none !important; } /* aunque tenga .active */
+}
+
     </style>
 </head>
-<body class="bg-slate-100 text-slate-800">
+<body class="bg-slate-100 min-h-screen pb-16 md:pb-0"> <!-- padding-bottom en móvil para no tapar el contenido con la barra inferior -->
 
-    <div class="container mx-auto p-4 md:p-6">
-
-        <!-- Encabezado y Botón de Acción Principal -->
-        <header class="flex flex-col md:flex-row justify-between items-center mb-6">
-            <div>
-                <h1 class="text-3xl font-bold text-slate-900">Gestión de Compras</h1>
-                <p class="text-slate-500 mt-1">Registra y consulta el historial de tus compras con ayuda de IA.</p>
-            </div>
-            <button id="show-register-form-btn" class="mt-4 md:mt-0 w-full md:w-auto bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-transform hover:scale-105 flex items-center justify-center">
-                <span class="material-icons mr-2">add_circle</span>
-                Registrar Nueva Compra
-            </button>
-        </header>
-
-        <!-- Sección de Registro (Inicialmente oculta) -->
-        <div id="register-section" class="hidden bg-white p-6 md:p-8 rounded-2xl shadow-xl mb-8">
-            <!-- El formulario de registro se inyectará aquí -->
-        </div>
-
-        <!-- Sección de Historial de Compras -->
-        <main id="history-section" class="bg-white p-6 md:p-8 rounded-2xl shadow-xl">
-            <h2 class="text-2xl font-bold text-slate-900 mb-4">Historial de Registros</h2>
-            <div id="history-filters" class="grid grid-cols-1 md:grid-cols-5 gap-2 mb-4">
-                <input id="history-search" type="text" placeholder="Buscar" class="p-2 border rounded-md">
-                <select id="filter-sucursal" class="p-2 border rounded-md">
-                    <option value="">Todas</option>
-                </select>
-                <input id="filter-start" type="date" class="p-2 border rounded-md">
-                <input id="filter-end" type="date" class="p-2 border rounded-md">
-                <select id="filter-status" class="p-2 border rounded-md">
-                    <option value="">Todos</option>
-                    <option>Pendiente</option>
-                    <option>Recibido con Discrepancias</option>
-                    <option>Completo</option>
-                </select>
-            </div>
-            <div id="history-list" class="space-y-4">
-                <!-- Indicador de carga inicial -->
-                <div id="history-loader" class="flex items-center justify-center py-10">
-                    <div class="spinner w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full"></div>
-                    <p class="ml-4 text-slate-500">Cargando registros...</p>
-                </div>
-                <!-- Los registros se insertarán aquí dinámicamente -->
-            </div>
-        </main>
-
-    </div>
-
-    <!-- Modal para ver Detalles de la Compra y Búsqueda de Productos -->
-    <div id="details-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 modal-overlay">
-        <div id="modal-container" class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col modal-container">
-            <header class="flex justify-between items-center p-4 border-b">
-                <h2 id="modal-title" class="text-xl font-bold">Detalles de la Compra</h2>
-                <button id="close-modal-btn" class="text-slate-500 hover:text-slate-800">
-                    <span class="material-icons">close</span>
-                </button>
-            </header>
-            <div id="modal-content" class="p-6 overflow-y-auto">
-                <!-- El contenido del modal se insertará aquí -->
-            </div>
-        </div>
-    </div>
-    
-    <!-- Contenedor de Notificaciones (Toast) -->
-    <div id="toast-container" class="fixed bottom-4 right-4 z-50"></div>
-
-    <!-- Indicador de carga del catálogo de productos -->
-    <div id="catalog-loader" class="hidden fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-        <div class="bg-white p-4 rounded-lg flex items-center">
-            <div class="spinner w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full mr-3"></div>
-            <span class="text-slate-700">Cargando catálogo de productos...</span>
+    <div id="loading-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded-lg shadow-xl flex items-center space-x-4">
+            <div class="spinner w-8 h-8 border-4 border-blue-500 rounded-full"></div>
+            <p id="loading-message" class="text-slate-700 font-medium">Conectando...</p>
         </div>
     </div>
 
-
-
-<script type="module">
-    // Importaciones de Firebase
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { initializeFirestore, collection, addDoc, onSnapshot, doc, getDoc, updateDoc, arrayUnion, query, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
-
-    // --- CONFIGURACIÓN DE FIREBASE ---
-    const firebaseConfig = {
-  apiKey: "5",
-  authDomain: "5",
-  projectId: "5",
-  storageBucket: "5",
-  messagingSenderId: "5",
-  appId: "5",
-  measurementId: "5"
-    };
-    const appId = firebaseConfig.projectId;
-    
-    // --- URL DE TU API DE APPS SCRIPT ---
-    const BIGQUERY_API_URL = 'https://script.google.com/macros/s/AKfycbzJN3owPwvd4pFf8MELg6oodJk3ge2cNvxjsf7CWy_2wia-Lz83ftFdGx5VzKxoABln/exec';
-
-    // --- INICIALIZACIÓN DE FIREBASE ---
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = initializeFirestore(app, {
-        experimentalForceLongPolling: true,
-        useFetchStreams: false,
-    });
-    const storage = getStorage(app);
-    const purchasesCollection = collection(db, `artifacts/${appId}/public/data/compras`);
-
-    let userId = null;
-    let extractedItems = [];
-    let totalFacturaAI = 0;
-    let imageUrls = [];
-    let productCatalog = [];
-    let isCatalogReady = false;
-    let allPurchases = [];
-    let currentEditId = null;
-
-    // --- ELEMENTOS DEL DOM ---
-    const showRegisterFormBtn = document.getElementById('show-register-form-btn');
-    const registerSection = document.getElementById('register-section');
-    const historyList = document.getElementById('history-list');
-    const historyLoader = document.getElementById('history-loader');
-    const historySearch = document.getElementById('history-search');
-    const filterSucursal = document.getElementById('filter-sucursal');
-    const filterStart = document.getElementById('filter-start');
-    const filterEnd = document.getElementById('filter-end');
-    const filterStatus = document.getElementById('filter-status');
-    const detailsModal = document.getElementById('details-modal');
-    const modalContainer = document.getElementById('modal-container');
-    const modalTitle = document.getElementById('modal-title');
-    const closeModalBtn = document.getElementById('close-modal-btn');
-    const modalContent = document.getElementById('modal-content');
-    const toastContainer = document.getElementById('toast-container');
-    const catalogLoader = document.getElementById('catalog-loader');
-
-    function formatDateDDMMYYYY(dateStr) {
-        const date = new Date(dateStr);
-        if (isNaN(date)) return dateStr;
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}-${month}-${year}`;
-    }
-
-    // --- LÓGICA DE LA APLICACIÓN ---
-
-    async function showRegisterForm() {
-        currentEditId = null;
-        registerSection.innerHTML = getRegisterFormHTML();
-        showRegisterFormBtn.classList.add('hidden');
-        await Promise.all([loadContacts(), loadCategories()]);
-        registerSection.classList.remove('hidden');
-
-        document.getElementById('purchase-form').addEventListener('submit', handleFormSubmit);
-        document.getElementById('file-upload').addEventListener('change', handleFileSelect);
-        document.getElementById('register-section').addEventListener('click', (e) => {
-            if (e.target.id === 'cancel-register-btn') {
-                hideRegisterForm();
-            }
-        });
-    }
-
-    function hideRegisterForm() {
-        registerSection.classList.add('hidden');
-        registerSection.innerHTML = '';
-        showRegisterFormBtn.classList.remove('hidden');
-        currentEditId = null;
-    }
-
-    function showEditForm(docId) {
-        const data = allPurchases.find(p => p.id === docId);
-        if (!data) return;
-        currentEditId = docId;
-        registerSection.innerHTML = getRegisterFormHTML(data, true);
-        registerSection.classList.remove('hidden');
-        showRegisterFormBtn.classList.add('hidden');
-
-        const form = document.getElementById('purchase-form');
-        document.getElementById('calculation-section').classList.remove('hidden');
-
-        extractedItems = (data.items || []).map(it => ({
-            descripcion: it.descripcion_factura,
-            cantidad: it.cantidad_factura,
-            unidades_por_paquete: it.unidades_por_paquete,
-            total_linea: it.total_linea_base,
-            clave_catalogo: it.clave_catalogo,
-            desc_catalogo: it.desc_catalogo
-        }));
-        imageUrls = data.images || [];
-        totalFacturaAI = data.total || 0;
-
-        displayCalculationUI();
-        document.getElementById('iva').value = data.iva_aplicado ?? 15;
-        document.getElementById('tipo-cambio').value = data.tipo_cambio_aplicado ?? 1;
-        renderItemsTable();
-
-        form.addEventListener('submit', (e) => handleFormSubmit(e, docId));
-        document.getElementById('register-section').addEventListener('click', (e) => {
-            if (e.target.id === 'cancel-register-btn') {
-                hideRegisterForm();
-            }
-        });
-    }
-
-    async function loadProductCatalog() {
-        catalogLoader.classList.remove('hidden');
-        try {
-            // Se solicita el catálogo completo enviando un término de búsqueda vacío.
-            // Usamos 'text/plain' como Content-Type para evitar problemas de CORS con despliegues simples de Apps Script.
-            const response = await fetch(BIGQUERY_API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ searchTerm: '' }) 
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Error de red: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            if (result.success) {
-                productCatalog = result.data;
-                isCatalogReady = true;
-                console.log("Catálogo de productos cargado exitosamente.");
-// Muestra las primeras 5 filas en la consola para verificación.
-console.log("Número de productos recibidos:", productCatalog.length);
-console.table(productCatalog.slice(0, 5));
-            } else {
-                throw new Error(result.error || "Error desconocido al obtener el catálogo.");
-            }
-        } catch (error) {
-            showToast(`Error al cargar catálogo: ${error.message}`, 'error');
-            console.error("Error en loadProductCatalog:", error);
-        } finally {
-            catalogLoader.classList.add('hidden');
-        }
-    }
-
-    async function loadContacts() {
-        const contactSelect = document.getElementById('contact-select');
-        if (!contactSelect) return;
-        contactSelect.innerHTML = '<option value="">Seleccionar Contacto</option>';
-        try {
-            const contactsRef = collection(db, `artifacts/${appId}/public/data/contactos`);
-            const snapshot = await getDocs(contactsRef);
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const option = document.createElement('option');
-                option.value = doc.id;
-                option.textContent = data.nombre || doc.id;
-                contactSelect.appendChild(option);
-            });
-        } catch (error) {
-            console.error('Error al cargar contactos:', error);
-        }
-    }
-
-    async function loadCategories() {
-        const categorySelect = document.getElementById('category-select');
-        if (!categorySelect) return;
-        categorySelect.innerHTML = '<option value="">Seleccionar Categoría</option>';
-        try {
-            const categoriesRef = collection(db, `artifacts/${appId}/public/data/categorias`);
-            const snapshot = await getDocs(categoriesRef);
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const option = document.createElement('option');
-                option.value = doc.id;
-                option.textContent = data.nombre || doc.id;
-                categorySelect.appendChild(option);
-            });
-        } catch (error) {
-            console.error('Error al cargar categorías:', error);
-        }
-    }
-
-    function getRegisterFormHTML(data = {}, isEdit = false) {
-        const title = isEdit ? 'Editar Registro' : 'Nuevo Registro';
-        const formHidden = isEdit ? '' : 'hidden';
-        const step1 = `
-             <div id="step1-upload">
-                 <div class="text-center p-6 border-2 border-dashed border-slate-300 rounded-lg">
-                     <label for="file-upload" class="cursor-pointer text-emerald-600 font-medium">
-                         <span class="material-icons text-4xl">cloud_upload</span><br>
-                         Subir Páginas de la Factura
-                     </label>
-                     <input id="file-upload" type="file" class="hidden" accept="image/*" multiple>
-                     <p class="text-xs text-slate-400 mt-2">Puedes seleccionar varias imágenes a la vez.</p>
-                 </div>
-                 <div id="image-preview-container" class="mt-4 hidden grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-                 <div id="ai-loader" class="hidden flex items-center justify-center bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-lg mt-4">
-                     <div class="spinner w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full mr-3"></div>
-                     <span id="ai-loader-text">Analizando factura con IA...</span>
-                 </div>
-             </div>`;
-
-        return `
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold">${title}</h2>
-                <button id="cancel-register-btn" class="text-slate-500 hover:text-slate-800">Cancelar</button>
-            </div>
-            ${isEdit ? '' : step1}
-            <form id="purchase-form" class="${formHidden} mt-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div><label for="fecha" class="block text-sm font-medium text-slate-700">Fecha</label><input type="date" id="fecha" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2" value="${data.fecha || ''}"></div>
-                    <div><label for="numero_factura" class="block text-sm font-medium text-slate-700">No. Factura</label><input type="text" id="numero_factura" placeholder="Número de la factura" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2" value="${data.numero_factura || ''}"></div>
-                    <div><label for="proveedor" class="block text-sm font-medium text-slate-700">Proveedor</label><input type="text" id="proveedor" placeholder="Nombre del proveedor" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2" value="${data.proveedor || ''}"></div>
-                    <div><label for="contact-select" class="block text-sm font-medium text-slate-700">Contacto</label><select id="contact-select" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"><option value="">Seleccionar Contacto</option></select></div>
-                    <div><label for="category-select" class="block text-sm font-medium text-slate-700">Categoría</label><select id="category-select" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"><option value="">Seleccionar Categoría</option></select></div>
-                    <div><label for="total" class="block text-sm font-medium text-slate-700">Monto Total (Factura)</label><input type="number" id="total" step="0.01" placeholder="0.00" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2 bg-slate-100" readonly value="${data.total || 0}"></div>
-                    <div><label for="sucursal" class="block text-sm font-medium text-slate-700">Sucursal</label><input type="text" id="sucursal" placeholder="Sucursal que recibe" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2" value="${data.sucursal || ''}"></div>
-                    <div><label for="transporte" class="block text-sm font-medium text-slate-700">Transporte</label><input type="text" id="transporte" placeholder="Transporte utilizado" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2" value="${data.transporte || ''}"></div>
-                    <div class="md:col-span-2"><label for="faltantes" class="block text-sm font-medium text-slate-700">Faltantes o Comentarios Adicionales</label><input type="text" id="faltantes" value="${data.faltantes || 'Ninguno'}" required class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
-                </div>
-                <div id="calculation-section" class="mt-8 hidden"></div>
-                <div class="mt-8 text-right"><button type="submit" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-lg shadow-md">Guardar Registro</button></div>
-            </form>
-         `;
-    }
-    
-    async function handleFileSelect(e) {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
-
-        const previewContainer = document.getElementById('image-preview-container');
-        previewContainer.innerHTML = '';
-        previewContainer.classList.remove('hidden');
-        
-        const aiLoader = document.getElementById('ai-loader');
-        const aiLoaderText = document.getElementById('ai-loader-text');
-        aiLoader.classList.remove('hidden');
-        
-        const fileDataPromises = Array.from(files).map(file => {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const base64String = event.target.result;
-                    const imgElement = document.createElement('img');
-                    imgElement.src = base64String;
-                    imgElement.className = 'w-full h-auto object-cover rounded-lg shadow-md';
-                    previewContainer.appendChild(imgElement);
-                    resolve({ base64: base64String, name: file.name, file: file });
-                };
-                reader.readAsDataURL(file);
-            });
-        });
-
-        const fileDataArray = await Promise.all(fileDataPromises);
-        
-        try {
-            aiLoaderText.textContent = `Subiendo ${files.length} imágenes a Storage...`;
-            const uploadPromises = fileDataArray.map(fileData => {
-                const storageRef = ref(storage, `invoices/${userId}/${Date.now()}-${fileData.name}`);
-                return uploadBytes(storageRef, fileData.file).then(snapshot => getDownloadURL(snapshot.ref));
-            });
-            imageUrls = await Promise.all(uploadPromises);
-            
-            aiLoaderText.textContent = 'Analizando factura con IA...';
-            const base64DataForAI = fileDataArray.map(fd => fd.base64.split(',')[1]);
-            const extractedData = await getAIData(base64DataForAI);
-
-            if (extractedData) {
-                document.getElementById('fecha').value = extractedData.fecha || '';
-                document.getElementById('proveedor').value = extractedData.proveedor || '';
-                document.getElementById('total').value = extractedData.total || 0;
-                totalFacturaAI = extractedData.total || 0;
+    <div id="app-shell" class="hidden min-h-screen flex flex-col">
+        <!-- Navbar: mismas IDs/clases; solo visual sticky y tamaños táctiles -->
+        <nav class="bg-white shadow-md sticky top-0 z-40">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center relative">
+                <div class="text-xl font-bold text-slate-800">Mi Empresa V2</div>
                 
-                // Asegurar que los items tengan las propiedades necesarias
-                extractedItems = (extractedData.items || []).map(item => ({
-                    ...item,
-                    unidades_por_paquete: 1, // Añadido
-                    clave_catalogo: null,
-                    desc_catalogo: null
-                }));
-                showToast('Datos y productos extraídos por la IA.', 'success');
-                displayCalculationUI();
-            } else {
-                showToast('La IA no pudo extraer datos, por favor ingrésalos manualmente.', 'error');
-                displayCalculationUI();
-            }
-        } catch (error) {
-            console.error("Error en el proceso de subida o análisis:", error);
-            showToast('Error al subir imágenes o contactar a la IA.', 'error');
-        } finally {
-            aiLoader.classList.add('hidden');
-            document.getElementById('purchase-form').classList.remove('hidden');
-        }
-    }
-
-    async function getAIData(base64DataArray) {
-        const apiKey = firebaseConfig.apiKey;
-const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
-        const parts = [
-            { text: "Analiza las siguientes imágenes que componen una factura de varias páginas. Consolida todos los artículos en una sola lista. El proveedor, fecha y el total final suelen estar en la primera o última página. Responde únicamente con un objeto JSON con las claves 'fecha' (YYYY-MM-DD), 'proveedor', 'total' (número), y 'items' (array de objetos con 'descripcion', 'cantidad' y 'total_linea'). Si un dato no se encuentra, su valor debe ser null o un array vacío para 'items'." }
-        ];
-
-        base64DataArray.forEach(data => {
-            parts.push({ inlineData: { mimeType: "image/jpeg", data } });
-        });
-
-        const payload = {
-            contents: [{ role: "user", parts }],
-            generationConfig: { responseMimeType: "application/json" }
-        };
-
-        try {
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-            const result = await response.json();
-            if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
-                const text = result.candidates[0].content.parts[0].text;
-
-                // --- Step 1: Visual Extraction ---
-                const extractedData = JSON.parse(text);
-
-                // --- Step 2: Text Correction ---
-                if (extractedData.items && extractedData.items.length > 0) {
-                    const descriptionsToCorrect = extractedData.items.map(item => item.descripcion);
-                    const correctionPrompt = `Por favor, corrige los errores de ortografía y posibles errores de OCR en el siguiente arreglo de descripciones de productos. Responde únicamente con un arreglo JSON de strings que contenga las descripciones corregidas, manteniendo el mismo orden y la misma cantidad de elementos. No añadas texto introductorio. El arreglo a corregir es: ${JSON.stringify(descriptionsToCorrect)}`;
-                    
-                    const correctionApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-                    const correctionPayload = {
-                        contents: [{ parts: [{ text: correctionPrompt }] }],
-                        generationConfig: { responseMimeType: "application/json" }
-                    };
-
-                    try {
-                        const correctionResponse = await fetch(correctionApiUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(correctionPayload)
-                        });
-
-                        if (correctionResponse.ok) {
-                            const correctionResult = await correctionResponse.json();
-                            if (correctionResult.candidates && correctionResult.candidates[0].content && correctionResult.candidates[0].content.parts[0]) {
-                                const correctedDescriptions = JSON.parse(correctionResult.candidates[0].content.parts[0].text);
-                                if (Array.isArray(correctedDescriptions) && correctedDescriptions.length === descriptionsToCorrect.length) {
-                                    correctedDescriptions.forEach((correctedDesc, index) => {
-                                        if (extractedData.items[index]) {
-                                            extractedData.items[index].descripcion = correctedDesc;
-                                        }
-                                    });
-                                }
-                            }
-                        }
-                    } catch (correctionError) {
-                        console.error("Error al corregir descripciones:", correctionError);
-                    }
-                }
-
-                return extractedData;
-            }
-            return null;
-        } catch (error) {
-            console.error("Error al procesar la solicitud a la IA:", error);
-            return null;
-        }
-    }
-    
-    function displayCalculationUI() {
-        const container = document.getElementById('calculation-section');
-        container.classList.remove('hidden');
-        container.innerHTML = `
-            <div class="bg-slate-50 p-6 rounded-lg">
-                <h3 class="text-lg font-bold mb-4">Ajustes y Verificación de Artículos</h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div><label for="iva" class="block text-sm font-medium text-slate-700">IVA (%)</label><input type="number" id="iva" value="15" step="0.01" class="recalc-trigger mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
-                    <div><label for="tipo-cambio" class="block text-sm font-medium text-slate-700">Tipo de Cambio</label><input type="number" id="tipo-cambio" value="1" step="0.01" class="recalc-trigger mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
+                <div id="nav-menu" class="nav-menu-mobile md:flex flex-grow justify-center space-x-4">
+                    <a href="#compras" data-page="compras.html" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Gestión de Compras</a>
+                    <a href="#app_extraccion.html" data-page="app_extraccion.html" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Transferencias</a>
+                    <a href="#app_pedidos_movil.html" data-page="app_pedidos_movil.html" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Pedidos</a>
+                    <a href="#analizador_cotizaciones.html" data-page="analizador_cotizaciones.html" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Analizador de Cotizaciones</a>
+                    <a href="#app_historial_transferencias.html" data-page="app_historial_transferencias.html" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Historial Transferencias</a>
                 </div>
-                <div id="items-table-container" class="overflow-x-auto"></div>
-                <div class="mt-4">
-                    <button type="button" id="add-item-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg flex items-center">
-                        <span class="material-icons mr-2">add</span>Añadir Artículo
+
+                <div class="flex items-center space-x-2">
+                    <button id="refresh-catalog-btn" class="min-h-11 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-md flex items-center" title="Actualizar Historial de Productos" aria-label="Actualizar Historial de Productos">
+                        <span class="material-icons text-base">sync</span>
+                        <span id="refresh-spinner" class="hidden spinner w-4 h-4 ml-2 border-2 rounded-full border-white border-t-transparent"></span>
+                    </button>
+                    <button id="logout-btn" class="min-h-11 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl shadow-md" title="Cerrar Sesión" aria-label="Cerrar Sesión">
+                        <span class="material-icons text-base">logout</span>
+                    </button>
+                    <button id="menu-toggle-btn" class="md:hidden p-2 rounded-md text-slate-700 hover:bg-slate-200" aria-controls="nav-menu" aria-expanded="false" aria-label="Abrir menú de navegación">
+                        <span class="material-icons">menu</span>
                     </button>
                 </div>
-                <div id="totals-summary" class="mt-6 text-right border-t pt-4"></div>
             </div>
-        `;
-        
-        renderItemsTable();
-        
-        document.querySelectorAll('.recalc-trigger').forEach(el => el.addEventListener('input', renderItemsTable));
-        document.getElementById('add-item-btn').addEventListener('click', addNewItemRow);
-        
-        const tableContainer = document.getElementById('items-table-container');
-        tableContainer.addEventListener('input', handleTableInput);
-        tableContainer.addEventListener('click', (e) => {
-             if (e.target.closest('.search-catalog-btn')) {
-                openSearchModal(e.target.closest('.search-catalog-btn').dataset.index);
-             }
-        });
-    }
+        </nav>
 
-    function addNewItemRow() {
-        extractedItems.push({
-            descripcion: '',
-            cantidad: 1,
-            unidades_por_paquete: 1,
-            total_linea: 0, 
-            clave_catalogo: null,
-            desc_catalogo: null
-        });
-        renderItemsTable();
-    }
-
-    function handleTableInput(e) {
-        const input = e.target;
-        if (!input.matches('.item-input')) return;
-
-        const index = parseInt(input.dataset.index);
-        const field = input.dataset.field;
-        const value = input.type === 'number' ? parseFloat(input.value) || 0 : input.value;
-
-        // 1. Actualizar el modelo de datos
-        extractedItems[index][field] = value;
-        
-        // 2. Recalcular la fila y actualizar su UI
-        const ivaPercent = parseFloat(document.getElementById('iva').value) || 0;
-        const tipoCambio = parseFloat(document.getElementById('tipo-cambio').value) || 1;
-        const ivaFactor = 1 + (ivaPercent / 100);
-
-        const item = extractedItems[index];
-        const totalBase = item.total_linea;
-        
-        const totalLineaFinalCalculado = totalBase * ivaFactor * tipoCambio;
-        const cantidadTotalUnidades = item.cantidad * item.unidades_por_paquete;
-        const precioFinalCalculado = cantidadTotalUnidades > 0 ? totalLineaFinalCalculado / cantidadTotalUnidades : 0;
-        
-        const row = input.closest('tr');
-        row.querySelector('.total-linea-final-cell').textContent = `$${totalLineaFinalCalculado.toFixed(2)}`;
-        row.querySelector('.precio-final-cell').textContent = `$${precioFinalCalculado.toFixed(2)}`;
-
-        // 3. Recalcular los totales generales
-        updateGrandTotal();
-    }
-    
-    function renderItemsTable() {
-        const tableContainer = document.getElementById('items-table-container');
-        const ivaPercent = parseFloat(document.getElementById('iva').value) || 0;
-        const tipoCambio = parseFloat(document.getElementById('tipo-cambio').value) || 1;
-        const ivaFactor = 1 + (ivaPercent / 100);
-
-        let itemsTableHTML = `
-            <table class="w-full text-sm item-table border-collapse">
-                <thead>
-                    <tr class="border-b">
-                        <th class="text-left p-2">Descripción</th>
-                        <th class="w-24 text-left p-2">Cant.</th>
-                        <th class="w-20 text-left p-2">UxP</th>
-                        <th class="w-32 text-left p-2">Total Base</th>
-                        <th class="w-28 text-left p-2">P. Final</th>
-                        <th class="w-32 text-left p-2">Total Línea</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-
-        extractedItems.forEach((item, index) => {
-            const totalBase = item.total_linea || 0;
-            const totalLineaFinalCalculado = totalBase * ivaFactor * tipoCambio;
-            const cantidadTotalUnidades = (item.cantidad || 0) * (item.unidades_por_paquete || 0);
-            const precioFinalCalculado = cantidadTotalUnidades > 0 ? totalLineaFinalCalculado / cantidadTotalUnidades : 0;
-            
-            itemsTableHTML += `
-                <tr class="border-b border-slate-200 hover:bg-slate-100">
-                    <td class="p-2">
-                        <input type="text" value="${item.descripcion || ''}" data-index="${index}" data-field="descripcion" class="item-input w-full p-1 border rounded">
-                        <div class="text-xs text-slate-500 mt-1">
-                            ${item.desc_catalogo || 'Sin vincular'}
-                            ${item.clave_catalogo ? `<span class="copy-clave-btn cursor-pointer text-blue-600 ml-1" data-clave="${item.clave_catalogo}" title="Copiar clave">(${item.clave_catalogo})</span>` : ''}
-                            <button type="button" data-index="${index}" class="search-catalog-btn text-blue-600 text-xs hover:underline ml-2">(buscar)</button>
-                        </div>
-                    </td>
-                    <td class="p-2"><input type="number" step="0.01" value="${item.cantidad || 1}" data-index="${index}" data-field="cantidad" class="item-input w-full p-1 border rounded"></td>
-                    <td class="p-2"><input type="number" step="0.01" value="${item.unidades_por_paquete || 1}" data-index="${index}" data-field="unidades_por_paquete" class="item-input w-full p-1 border rounded"></td>
-                    <td class="p-2"><input type="number" step="0.01" value="${totalBase.toFixed(2)}" data-index="${index}" data-field="total_linea" class="item-input w-full p-1 border rounded"></td>
-                    <td class="p-2 font-medium text-right precio-final-cell">$${precioFinalCalculado.toFixed(2)}</td>
-                    <td class="p-2 font-semibold text-right total-linea-final-cell">$${totalLineaFinalCalculado.toFixed(2)}</td>
-                </tr>
-            `;
-        });
-
-        itemsTableHTML += `</tbody></table>`;
-        tableContainer.innerHTML = itemsTableHTML;
-        
-        updateGrandTotal();
-    }
-    
-    function updateGrandTotal() {
-        const ivaPercent = parseFloat(document.getElementById('iva').value) || 0;
-        const tipoCambio = parseFloat(document.getElementById('tipo-cambio').value) || 1;
-        const ivaFactor = 1 + (ivaPercent / 100);
-
-        const granTotalCalculado = extractedItems.reduce((sum, item) => {
-            const totalBase = item.total_linea || 0;
-            return sum + (totalBase * ivaFactor * tipoCambio);
-        }, 0);
-
-        const summaryContainer = document.getElementById('totals-summary');
-        const diferencia = totalFacturaAI - granTotalCalculado;
-        const diffClass = Math.abs(diferencia) < 1 ? 'text-green-600' : 'text-red-600';
-
-        summaryContainer.innerHTML = `
-            <p class="text-sm">Total Factura (IA): <span class="font-bold text-slate-600">$${totalFacturaAI.toFixed(2)}</span></p>
-            <p class="text-lg">Total Calculado: <span class="font-bold text-slate-900">$${granTotalCalculado.toFixed(2)}</span></p>
-            <p class="text-sm ${diffClass}">Diferencia: <span class="font-bold">$${diferencia.toFixed(2)}</span></p>
-        `;
-    }
-
-    // Funciones de búsqueda y modal
-    async function openSearchModal(index) {
-        if (!isCatalogReady) {
-            showToast('El catálogo aún no está listo, por favor espera un momento.', 'error');
-            return;
-        }
-        const item = extractedItems[index];
-        modalTitle.textContent = 'Buscar Producto en Catálogo';
-        modalContainer.classList.remove('max-w-4xl');
-        modalContainer.classList.add('max-w-2xl');
-        modalContent.innerHTML = `
-            <div>
-                <label for="search-input" class="block text-sm font-medium text-slate-700">Buscar por descripción:</label>
-                <input type="text" id="search-input" value="${item.descripcion}" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2">
-                <div id="search-results-loader" class="hidden text-center py-4"><div class="spinner w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto"></div></div>
-                <div id="search-results" class="mt-4 max-h-64 overflow-y-auto"></div>
+        <!-- Cabecera pegajosa del módulo con búsqueda (solo UI; sin JS nuevo) -->
+        <div class="module-header bg-slate-100/80 supports-[backdrop-filter]:bg-slate-100/60 border-b border-slate-200">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-3">
+                <div class="relative">
+                    <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                    <input type="search" placeholder="Buscar productos, proveedores o vistas…" class="w-full h-11 pl-10 pr-3 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                </div>
             </div>
-        `;
-        detailsModal.classList.remove('hidden');
+        </div>
 
-        const searchInput = document.getElementById('search-input');
-        
-        // Realizar búsqueda inicial
-        performSearch(searchInput.value, index);
+        <main id="content-container" class="container mx-auto p-4 md:p-6 flex-grow">
+        </main>
+    </div>
 
-        searchInput.addEventListener('input', () => {
-            performSearch(searchInput.value, index);
-        });
+    <!-- Barra inferior para móvil (no afecta la lógica; enlaces por hash) -->
+    <nav class="bottom-nav md:hidden bg-white border-t border-slate-200">
+        <div class="grid grid-cols-5 text-xs text-slate-600">
+            <a class="flex flex-col items-center py-2" href="#compras" data-page="compras.html"><span class="material-icons">shopping_cart</span><span>Compras</span></a>
+            <a class="flex flex-col items-center py-2" href="#app_extraccion.html" data-page="app_extraccion.html"><span class="material-icons">compare_arrows</span><span>Transf.</span></a>
+            <a class="flex flex-col items-center py-2" href="#app_pedidos_movil.html" data-page="app_pedidos_movil.html"><span class="material-icons">playlist_add</span><span>Pedidos</span></a>
+            <a class="flex flex-col items-center py-2" href="#analizador_cotizaciones.html" data-page="analizador_cotizaciones.html"><span class="material-icons">request_quote</span><span>Cotiz.</span></a>
+            <a class="flex flex-col items-center py-2" href="#app_historial_transferencias.html" data-page="app_historial_transferencias.html"><span class="material-icons">history</span><span>Historial</span></a>
+        </div>
+    </nav>
+
+<script type="module">
+    import { appState } from './state.js';
+    import { auth, db as firestoreDb } from './firebase-init.js';
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { loadContent } from './app_loader.js';
+    import { createRouter } from './framework/router-lite.js';
+    import { registry } from './framework/registry.js';
+
+
+    // Registro del Service Worker para caché de la app (sin cambios funcionales)
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+            .then(registration => console.log('Service Worker registrado con éxito:', registration.scope))
+            .catch(error => console.error('Fallo en el registro del Service Worker:', error));
     }
 
-    function performSearch(searchTerm, itemIndex) {
-        const resultsContainer = document.getElementById('search-results');
-        
-        if (!isCatalogReady) {
-            resultsContainer.innerHTML = '<p class="text-slate-500">El catálogo aún está cargando...</p>';
-            return;
-        }
+    const appShell = document.getElementById('app-shell');
+    const contentContainer = document.getElementById('content-container');
+    const navLinks = document.querySelectorAll('.nav-link');
+    const refreshCatalogBtn = document.getElementById('refresh-catalog-btn');
+    const refreshSpinner = document.getElementById('refresh-spinner');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const loadingMessage = document.getElementById('loading-message');
+    const menuToggleBtn = document.getElementById('menu-toggle-btn');
+    const navMenu = document.getElementById('nav-menu');
 
-        const terms = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
-        const results = productCatalog.filter(prod => {
-            const haystack = `${prod.Descripcion} ${prod.Clave}`.toLowerCase();
-            return terms.every(t => haystack.includes(t));
-        }).slice(0, 100); // Limitar a 100 resultados para no sobrecargar el DOM
+    const BIGQUERY_API_URL = 'https://script.google.com/macros/s/AKfycbx6mWhvloaWRprnYFlEQ5iAHh4yMlwsHYk4x-iKXiDZeBX2JglqcOv87pUpwym0q1g_/exec';
+    const CACHE_KEY = 'catalogData';
+    const DB_NAME = 'ProductDashboardDB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'catalog';
 
-        displaySearchResults(results, itemIndex);
-    }
+    const router = createRouter({
+  container: contentContainer,
+  registry,
+  deps: { appState, auth, db: firestoreDb },
+  fallbackLoadContent: async (routeOrFile) => {
+    const file = routeOrFile.endsWith('.html') ? routeOrFile : 'compras.html';
+    await loadContent(file, contentContainer);
+  }
+});
 
-    function displaySearchResults(results, itemIndex) {
-        const resultsContainer = document.getElementById('search-results');
-        if (results.length === 0) {
-            resultsContainer.innerHTML = '<p class="text-slate-500">No se encontraron productos.</p>';
-            return;
-        }
-        resultsContainer.innerHTML = results.map(product => `
-            <div class="p-3 border rounded-lg mb-2 hover:bg-slate-100 cursor-pointer select-product-btn" data-clave="${product.Clave}" data-desc="${product.Descripcion}">
-                <p class="font-semibold">${product.Descripcion}</p>
-                <p class="text-sm text-slate-600">Clave: ${product.Clave}</p>
-            </div>
-        `).join('');
 
-        document.querySelectorAll('.select-product-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                extractedItems[itemIndex].clave_catalogo = btn.dataset.clave;
-                extractedItems[itemIndex].desc_catalogo = btn.dataset.desc;
-                detailsModal.classList.add('hidden');
-                modalContainer.classList.add('max-w-4xl');
-                modalContainer.classList.remove('max-w-2xl');
-                renderItemsTable();
-            });
-        });
-    }
-    
-    async function handleFormSubmit(e, docId = null) {
-        e.preventDefault();
-        const submitButton = e.target.querySelector('button[type="submit"]');
-        submitButton.disabled = true;
-        submitButton.innerHTML = `<div class="spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full mx-auto"></div>`;
+    window.productCatalog = [];
+    window.allProveedores = [];
+    window.isCatalogReady = false;
 
-        if (!docId && imageUrls.length === 0) {
-            showToast('Por favor, sube al menos una imagen de la factura.', 'error');
-            submitButton.disabled = false;
-            submitButton.textContent = 'Guardar Registro';
-            return;
-        }
-
-        const form = e.target;
-        const proveedor = form.proveedor.value.trim();
-        const numeroFactura = form.numero_factura.value.trim();
-
-        if (!docId && proveedor && numeroFactura) {
-            const q = query(purchasesCollection, where("proveedor", "==", proveedor), where("numero_factura", "==", numeroFactura));
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-                showToast('Error: Ya existe una factura con ese número para este proveedor.', 'error');
-                submitButton.disabled = false;
-                submitButton.textContent = 'Guardar Registro';
+    // --- IndexedDB Functions ---
+    let db;
+    function openDatabase() {
+        return new Promise((resolve, reject) => {
+            if (db) {
+                resolve(db);
                 return;
             }
-        }
-        
-        const ivaPercent = parseFloat(document.getElementById('iva').value) || 0;
-        const tipoCambio = parseFloat(document.getElementById('tipo-cambio').value) || 1;
-        const ivaFactor = 1 + (ivaPercent / 100);
-
-        const finalItems = extractedItems.map(item => {
-            const totalBase = item.total_linea || 0;
-            const totalLineaFinal = totalBase * ivaFactor * tipoCambio;
-            const cantidadTotalUnidades = (item.cantidad || 0) * (item.unidades_por_paquete || 0);
-            const precioFinal = cantidadTotalUnidades > 0 ? totalLineaFinal / cantidadTotalUnidades : 0;
-
-            return {
-                descripcion_factura: item.descripcion,
-                clave_catalogo: item.clave_catalogo,
-                desc_catalogo: item.desc_catalogo,
-                cantidad_factura: item.cantidad,
-                total_linea_base: totalBase,
-                unidades_por_paquete: item.unidades_por_paquete,
-                precio_final: precioFinal,
-                total_linea_final: totalLineaFinal,
-                recibido: false
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onerror = (event) => reject("Error al abrir IndexedDB:", event.target.errorCode);
+            request.onsuccess = (event) => {
+                db = event.target.result;
+                resolve(db);
+            };
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                store.createIndex('timestamp', 'timestamp');
             };
         });
+    }
 
-        const purchaseData = {
-            fecha: form.fecha.value,
-            proveedor: proveedor,
-            numero_factura: numeroFactura,
-            total: totalFacturaAI,
-            sucursal: form.sucursal.value,
-            transporte: form.transporte.value,
-            faltantes: form.faltantes.value,
-            images: imageUrls,
-            items: finalItems,
-            iva_aplicado: ivaPercent,
-            tipo_cambio_aplicado: tipoCambio
+    async function saveCatalogToDB(data) {
+        await openDatabase();
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        store.put({ id: CACHE_KEY, data: data, timestamp: Date.now() });
+        return new Promise(resolve => transaction.oncomplete = resolve);
+    }
+
+    async function getCatalogFromDB() {
+        await openDatabase();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.get(CACHE_KEY);
+            request.onsuccess = (event) => resolve(event.target.result);
+            request.onerror = (event) => reject(event.target.errorCode);
+        });
+    }
+
+    // --- Data Processing Functions ---
+    function translateBigQueryData(rawCatalog) {
+        if (!Array.isArray(rawCatalog)) {
+            console.error("Los datos recibidos no son un arreglo:", rawCatalog);
+            return [];
+        }
+
+        return rawCatalog.map(p => {
+            if (!p || typeof p !== 'object' || !p.Clave) { return null; }
+            const cleanData = {
+                ...p, Descripcion: p.Descripcion === '(en blanco)' ? 'Producto sin descripción' : p.Descripcion,
+                D_Global: parseFloat(p.D_Global) || 0, InvSeg: parseFloat(p.InvSeg) || 0, Tr_meses: parseFloat(p.Tr_meses) || 0,
+                PrecioU_Ref: parseFloat(p.PrecioU_Ref) || 0, PrecioVta_Ref: parseFloat(p.PrecioVta_Ref) || 0,
+                BasePack: parseInt(p.BasePack, 10) || 0, ModeQty: parseInt(p.ModeQty, 10) || 0,
+            };
+            const stockTotal = (parseFloat(p.Alm_1) || 0) + (parseFloat(p.Alm_2) || 0) + (parseFloat(p.Alm_3) || 0) + (parseFloat(p.Alm_4) || 0);
+            let ventas24 = {};
+            if (p.ventas24Json && typeof p.ventas24Json === 'string' && p.ventas24Json.trim() !== '(en blanco)') {
+                try { ventas24 = JSON.parse(p.ventas24Json); } catch (e) { console.warn(`Error al parsear ventas24Json para ${p.Clave}:`, p.ventas24Json); }
+            }
+            let preciosCompraRecientes = [];
+            if (p.preciosCompraRecientes && typeof p.preciosCompraRecientes === 'string' && p.preciosCompraRecientes.trim() !== '(en blanco)' && p.preciosCompraRecientes.trim().startsWith('[')) {
+                try { preciosCompraRecientes = JSON.parse(p.preciosCompraRecientes); } catch (e) { console.warn(`Error al parsear preciosCompraRecientes para ${p.Clave}:`, p.preciosCompraRecientes); }
+            }
+            const productoTraducido = {
+                ...cleanData, id: p.Clave, clave: p.Clave, nombre: cleanData.Descripcion, stockTotal: stockTotal,
+                stats: { ventas24, preciosCompraRecientes }
+            };
+            productoTraducido.kpis = calculateDynamicKpis(productoTraducido, stockTotal);
+            return productoTraducido;
+        }).filter(Boolean);
+    }
+
+    function calculateDynamicKpis(product, stockActual) {
+        const { D_Global = 0, InvSeg = 0, Tr_meses = 0.5, PrecioU_Ref = 0, PrecioVta_Ref = 0, HabitualesStr = '', BasePack = 0, ModeQty = 0 } = product;
+        const epsilon = 1e-6;
+        const DemandaDia = D_Global / 30.5;
+        const ROP = D_Global * Tr_meses + InvSeg;
+        const PedirCrudo = Math.max(0, ROP - stockActual);
+        let PedirRedondeado = 0;
+        let RazonRedondeo = '';
+        let PackUsado = 0;
+        if (PedirCrudo > 0) {
+            const habituales = (HabitualesStr || '').split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n) && n > 0).sort((a, b) => a - b);
+            const candidatoHabitual = habituales.find(h => h >= PedirCrudo);
+            if (candidatoHabitual && Math.abs(candidatoHabitual - PedirCrudo) <= (0.05 * PedirCrudo)) {
+                PedirRedondeado = candidatoHabitual; RazonRedondeo = 'habitual'; PackUsado = candidatoHabitual;
+            } else {
+                const BasePackEfectivo = BasePack > 0 ? BasePack : (ModeQty > 0 ? ModeQty : 0);
+                if (BasePackEfectivo > 0) {
+                    PedirRedondeado = Math.ceil(PedirCrudo / BasePackEfectivo) * BasePackEfectivo; RazonRedondeo = 'multiple_basepack'; PackUsado = BasePackEfectivo;
+                } else {
+                    const multiplos = [3, 6, 10, 12, 24, 48, 50, 100];
+                    const factor = multiplos.find(m => m >= PedirCrudo * 0.15 && m < PedirCrudo * 2) || (PedirCrudo > 12 ? 12 : 6);
+                    PedirRedondeado = Math.ceil(PedirCrudo / factor) * factor; RazonRedondeo = 'multiple_generico'; PackUsado = factor;
+                }
+            }
+            if (PedirCrudo > 0 && PedirRedondeado === 0) PedirRedondeado = PackUsado > 0 ? PackUsado : 1;
+        }
+        const PrioridadScore = ((PrecioVta_Ref - PrecioU_Ref) * D_Global * Tr_meses - Math.max(stockActual, ROP) * PrecioU_Ref * 0.03 * Tr_meses - Math.max(stockActual - ROP, 0) * PrecioU_Ref * 0.20 * Tr_meses) / Math.max(PedirRedondeado * PrecioU_Ref, 1);
+        return {
+            cantidadSugerida: PedirRedondeado, puntoDeReorden: ROP, vmp: D_Global, diasInv: stockActual / Math.max(DemandaDia, epsilon),
+            RazonRedondeo, PackUsado, RiesgoRuptura: stockActual <= InvSeg, SubtotalPedido: PedirRedondeado * PrecioU_Ref,
+            CoberturaPostPedido_meses: (stockActual + PedirRedondeado) / Math.max(D_Global, epsilon),
+            PrioridadScore: (stockActual <= InvSeg && (PrecioVta_Ref * D_Global * Tr_meses) > 0) ? 1000 + (PrecioVta_Ref * D_Global * Tr_meses) : PrioridadScore
         };
-        if (!docId) {
-            purchaseData.comments = [];
-            purchaseData.createdAt = new Date();
-            purchaseData.createdBy = userId;
-            purchaseData.agregado_sicar = false;
-        }
-
-        try {
-            if (docId) {
-                const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
-                await updateDoc(docRef, purchaseData);
-                showToast('Registro actualizado con éxito.', 'success');
-            } else {
-                await addDoc(purchasesCollection, purchaseData);
-                showToast('Compra registrada con éxito.', 'success');
-            }
-            hideRegisterForm();
-            form.reset();
-            imageUrls = [];
-            extractedItems = [];
-            totalFacturaAI = 0;
-        } catch (error) {
-            console.error("Error al guardar el documento: ", error);
-            showToast(`Error al guardar: ${error.message}`, 'error');
-        } finally {
-             submitButton.disabled = false;
-             submitButton.textContent = 'Guardar Registro';
-        }
     }
 
-    // Funciones de historial y detalles
-    function listenToPurchases() {
-        const q = query(purchasesCollection, orderBy("createdAt", "desc"));
-        onSnapshot(q, (snapshot) => {
-            historyLoader.classList.add('hidden');
-            allPurchases = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            populateSucursalFilter();
-            applyHistoryFilters();
-        });
-    }
-
-    function populateSucursalFilter() {
-        const options = [...new Set(allPurchases.map(p => p.sucursal).filter(Boolean))];
-        const current = filterSucursal.value;
-        filterSucursal.innerHTML = '<option value="">Todas</option>';
-        options.forEach(suc => {
-            const opt = document.createElement('option');
-            opt.value = suc;
-            opt.textContent = suc;
-            filterSucursal.appendChild(opt);
-        });
-        if (options.includes(current)) {
-            filterSucursal.value = current;
-        }
-    }
-
-    function getReceptionStatus(items = []) {
-        if (!items || items.length === 0) return 'Pendiente';
-        const allRec = items.every(it => it.recibido);
-        const noneRec = items.every(it => !it.recibido);
-        if (allRec) return 'Completo';
-        if (noneRec) return 'Pendiente';
-        return 'Recibido con Discrepancias';
-    }
-
-    function applyHistoryFilters() {
-        const search = historySearch.value.trim().toLowerCase();
-        const sucursal = filterSucursal.value;
-        const start = filterStart.value;
-        const end = filterEnd.value;
-        const status = filterStatus.value;
-
-        const filtered = allPurchases.filter(p => {
-            if (search) {
-                const textMatch = [p.numero_factura, p.proveedor, ...(p.items || []).map(i => i.descripcion_factura || '')]
-                    .some(val => val && val.toString().toLowerCase().includes(search));
-                if (!textMatch) return false;
-            }
-            if (sucursal && p.sucursal !== sucursal) return false;
-            if (start && new Date(p.fecha) < new Date(start)) return false;
-            if (end && new Date(p.fecha) > new Date(end)) return false;
-            const recStatus = getReceptionStatus(p.items || []);
-            if (status && recStatus !== status) return false;
-            return true;
-        });
-
-        renderHistory(filtered);
-    }
-
-    function renderHistory(list) {
-        if (!list.length) {
-            historyList.innerHTML = '<p class="text-center text-slate-500 py-8">No se encontraron registros.</p>';
-            return;
-        }
-        historyList.innerHTML = '';
-        list.forEach(p => {
-            const card = document.createElement('div');
-            card.className = 'border border-slate-200 p-4 rounded-lg flex justify-between items-center hover:bg-slate-50 transition-colors';
-            if (p.agregado_sicar) card.classList.add('bg-blue-100');
-            card.innerHTML = `
-                <div>
-                    <p class="font-bold text-lg text-slate-800">${p.proveedor} <span class="font-normal text-base text-slate-500">#${p.numero_factura || 'N/A'}</span></p>
-                    <p class="text-sm text-slate-500">Fecha: ${formatDateDDMMYYYY(p.fecha)} | Total: $${(p.total || 0).toFixed(2)}</p>
-                </div>
-                <div class="space-x-2">
-                    <button data-id="${p.id}" class="edit-btn bg-amber-500 hover:bg-amber-600 text-white font-medium py-2 px-3 rounded-lg">Editar</button>
-                    <button data-id="${p.id}" class="view-details-btn bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-2 px-4 rounded-lg">Ver Detalles</button>
-                </div>
-            `;
-            historyList.appendChild(card);
-        });
-    }
-    
-    async function showDetails(docId) {
-        try {
-            const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                modalTitle.textContent = 'Detalles de la Compra';
-                modalContainer.classList.add('max-w-4xl');
-                modalContainer.classList.remove('max-w-2xl');
-                const data = docSnap.data();
-                modalContent.innerHTML = generateModalContent(docId, data);
-                detailsModal.classList.remove('hidden');
-                document.getElementById('add-comment-form').addEventListener('submit', (e) => handleAddComment(e, docId));
-                document.getElementById('add-image-input').addEventListener('change', (e) => handleAddNewImage(e, docId));
-                document.querySelectorAll('.item-received-checkbox').forEach(checkbox => {
-                    checkbox.addEventListener('change', (e) => handleItemReceivedToggle(e, docId));
+    function extractSuppliers(catalog) {
+        const supplierNames = new Set();
+        catalog.forEach(p => {
+            if (p && p.stats && p.stats.preciosCompraRecientes) {
+                p.stats.preciosCompraRecientes.forEach(compra => {
+                    if (compra.Proveedor) supplierNames.add(compra.Proveedor);
                 });
-                document.getElementById('edit-record-btn').addEventListener('click', () => {
-                    detailsModal.classList.add('hidden');
-                    showEditForm(docId);
-                });
-                document.getElementById('toggle-sicar-btn').addEventListener('click', (e) => {
-                    const current = e.target.dataset.agregado === 'true';
-                    toggleAgregadoSicar(docId, current);
-                });
-            } else {
-                showToast('No se encontró el registro.', 'error');
             }
-        } catch (error) {
-            showToast(`Error al cargar detalles: ${error.message}`, 'error');
-        }
+        });
+        return Array.from(supplierNames).sort();
     }
 
-    function generateModalContent(docId, data) {
-        const imagesHTML = (data.images || []).map(imgSrc => `<a href="${imgSrc}" target="_blank"><img src="${imgSrc}" alt="Factura" class="w-full h-auto max-h-80 object-contain rounded-lg border mb-2"></a>`).join('');
-        const commentsHTML = (data.comments || []).map(comment => `<div class="bg-slate-100 p-3 rounded-lg"><p class="text-sm">${comment.text}</p><p class="text-xs text-right text-slate-400 mt-1">${new Date(comment.createdAt.toDate()).toLocaleString()}</p></div>`).join('<div class="my-2"></div>') || '<p class="text-sm text-slate-400">No hay comentarios.</p>';
+    // --- Main Logic ---
+    async function loadOrRefreshCatalog(forceRefresh = false) {
+    loadingMessage.textContent = 'Verificando datos locales...';
+    loadingOverlay.classList.remove('hidden');
+    refreshSpinner.classList.remove('hidden');
+    refreshCatalogBtn.disabled = true;
 
-        let itemsHTML = '<p class="text-sm text-slate-400">No se registraron artículos para esta compra.</p>';
-        if (data.items && data.items.length > 0) {
-            itemsHTML = `
-                <table class="w-full text-sm item-table border-collapse">
-                    <thead>
-                        <tr class="border-b">
-                            <th class="w-10">Rec.</th>
-                            <th>Descripción</th>
-                            <th>Cant.</th>
-                            <th>UxP</th>
-                            <th>P. Final</th>
-                            <th>Total Final</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${data.items.map((item, index) => `
-                            <tr class="border-b border-slate-100">
-                                <td><input type="checkbox" data-index="${index}" class="item-received-checkbox" ${item.recibido ? 'checked' : ''}></td>
-                                <td>
-                                    <div class="font-medium">${item.desc_catalogo || item.descripcion_factura}</div>
-                                    <div class="text-xs text-slate-500">
-                                        ${item.clave_catalogo ? `<span class="copy-clave-btn copy-btn cursor-pointer" data-copy="${item.clave_catalogo}" title="Copiar clave">${item.clave_catalogo}</span>` : 'Sin vincular'}
-                                    </div>
-                                </td>
-                                <td><span class="copy-btn cursor-pointer" data-copy="${item.cantidad_factura}" title="Copiar">${item.cantidad_factura}</span></td>
-                                <td>${item.unidades_por_paquete}</td>
-                                <td><span class="copy-btn cursor-pointer" data-copy="${(item.precio_final || 0).toFixed(2)}" title="Copiar">$${(item.precio_final || 0).toFixed(2)}</span></td>
-                                <td class="font-semibold">$${(item.total_linea_final || 0).toFixed(2)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-        }
+    const CACHE_EXPIRATION = 12 * 60 * 60 * 1000; // 12 horas
+    let cachedData = null;
 
-        return `
-            <div class="space-y-6">
-                <div class="flex justify-end space-x-2">
-                    <button id="edit-record-btn" class="bg-amber-500 hover:bg-amber-600 text-white font-medium py-2 px-4 rounded-lg" data-id="${docId}">Editar</button>
-                    <button id="toggle-sicar-btn" data-agregado="${data.agregado_sicar ? 'true' : 'false'}" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg">${data.agregado_sicar ? 'Quitar de Sicar' : 'Marcar Agregado en Sicar'}</button>
-                </div>
-                <div>
-                    <h3 class="font-bold mb-2">Detalles Generales</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 text-sm bg-slate-50 p-4 rounded-lg">
-                        <p><strong class="font-medium text-slate-500">Proveedor:</strong><br><span class="copy-btn cursor-pointer" data-copy="${data.proveedor}" title="Copiar">${data.proveedor}</span></p>
-                        <p><strong class="font-medium text-slate-500">Fecha:</strong><br><span class="copy-btn cursor-pointer" data-copy="${formatDateDDMMYYYY(data.fecha)}" title="Copiar">${formatDateDDMMYYYY(data.fecha)}</span></p>
-                        <p><strong class="font-medium text-slate-500">No. Factura:</strong><br><span class="copy-btn cursor-pointer" data-copy="${data.numero_factura || 'No especificado'}" title="Copiar">${data.numero_factura || 'No especificado'}</span></p>
-                    </div>
-                </div>
-                <div>
-                    <h3 class="font-bold mb-2">Artículos de la Factura</h3>
-                    <div class="bg-slate-50 p-4 rounded-lg mb-4">${itemsHTML}</div>
-                </div>
-                <div>
-                    <h3 class="font-bold mb-2">Imágenes Adjuntas</h3>
-                    <div class="p-4 bg-slate-50 rounded-lg mb-4">${imagesHTML}</div>
-                    <label for="add-image-input" class="mt-4 inline-block cursor-pointer bg-blue-100 text-blue-800 hover:bg-blue-200 text-sm font-medium py-2 px-4 rounded-lg">
-                        <span class="material-icons text-base align-middle mr-1">add_photo_alternate</span>
-                        Añadir otra imagen
-                    </label>
-                    <input type="file" id="add-image-input" class="hidden" accept="image/*">
-                </div>
-                <div>
-                    <h3 class="font-bold mb-2">Comentarios</h3>
-                    <div class="space-y-3 mb-4">${commentsHTML}</div>
-                    <form id="add-comment-form">
-                        <textarea id="comment-text" placeholder="Escribe un comentario..." required class="w-full p-2 border rounded-lg"></textarea>
-                        <button type="submit" class="mt-2 bg-emerald-500 text-white font-medium py-2 px-4 rounded-lg">Añadir Comentario</button>
-                    </form>
-                </div>
-            </div>
-        `;
-    }
-    
-    async function handleItemReceivedToggle(e, docId) {
-        const checkbox = e.target;
-        const itemIndex = parseInt(checkbox.dataset.index);
-
-        const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
+    if (!forceRefresh) {
         try {
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                const purchaseData = docSnap.data();
-                const updatedItems = [...purchaseData.items];
-                updatedItems[itemIndex].recibido = checkbox.checked;
-                
-                await updateDoc(docRef, { items: updatedItems });
-                showToast(`Item #${itemIndex + 1} actualizado.`, 'success');
-            }
-        } catch (error) {
-            showToast(`Error al actualizar el item: ${error.message}`, 'error');
-            checkbox.checked = !checkbox.checked;
-        }
-    }
-
-    async function handleAddComment(e, docId) {
-        e.preventDefault();
-        const form = e.target;
-        const commentText = form.querySelector('#comment-text').value;
-        if (!commentText.trim()) return;
-        const newComment = { text: commentText, createdAt: new Date(), authorId: userId };
-        const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
-        try {
-            await updateDoc(docRef, { comments: arrayUnion(newComment) });
-            form.reset();
-            showToast('Comentario añadido.', 'success');
-        } catch (error) {
-            showToast(`Error al añadir comentario: ${error.message}`, 'error');
+            cachedData = await getCatalogFromDB();
+        } catch (e) {
+            console.error("Error al leer de IndexedDB:", e);
         }
     }
     
-    async function handleAddNewImage(e, docId) {
-        const file = e.target.files[0];
-        if (!file) return;
+    // ⬇️ --- CAMBIO 1: Usar appState al cargar desde caché ---
+    if (cachedData && Date.now() - cachedData.timestamp < CACHE_EXPIRATION) {
+        console.log("Cargando historial desde IndexedDB.");
+        appState.productCatalog = translateBigQueryData(cachedData.data);
+        appState.allProveedores = extractSuppliers(appState.productCatalog);
+        appState.isCatalogReady = true;
         
-        showToast('Subiendo imagen...', 'success');
-        try {
-            const storageRef = ref(storage, `invoices/${userId}/${docId}/${Date.now()}-${file.name}`);
-            const snapshot = await uploadBytes(storageRef, file);
-            const downloadURL = await getDownloadURL(snapshot.ref);
+        loadingOverlay.classList.add('hidden');
+        refreshSpinner.classList.add('hidden');
+        refreshCatalogBtn.disabled = false;
+        return;
+    }
 
-            const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
-            await updateDoc(docRef, { images: arrayUnion(downloadURL) });
-            showToast('Imagen añadida con éxito.', 'success');
-        } catch (error) {
-            showToast(`Error al añadir imagen: ${error.message}`, 'error');
+    loadingMessage.textContent = 'Cargando historial desde el servidor...';
+    try {
+        const response = await fetch(BIGQUERY_API_URL, {
+            method: 'POST', mode: 'cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ requestType: 'getHistory' })  
+        });
+        
+        if (!response.ok) throw new Error(`Error de red: ${response.statusText}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            await saveCatalogToDB(result.data);
+            
+            // ⬇️ --- CAMBIO 2: Usar appState al cargar desde la red ---
+            appState.productCatalog = translateBigQueryData(result.data);
+            appState.allProveedores = extractSuppliers(appState.productCatalog);
+            appState.isCatalogReady = true;
+
+            console.log("Historial cargado desde BigQuery y guardado en IndexedDB.");
+        } else {
+            throw new Error(result.error || "Error desconocido al obtener el historial.");
         }
-    }
+    } catch (error) {
+        console.error("Error crítico al cargar el historial de productos:", error);
+        loadingMessage.textContent = `Error al cargar: ${error.message}`;
+        
+        if (cachedData) {
+            console.log("Falló la carga de la red. Cargando datos expirados desde IndexedDB como respaldo.");
+            
+            // ⬇️ --- CAMBIO 3: Usar appState al cargar el respaldo de caché ---
+            appState.productCatalog = translateBigQueryData(cachedData.data);
+            appState.allProveedores = extractSuppliers(appState.productCatalog);
+            appState.isCatalogReady = true;
 
-    async function toggleAgregadoSicar(docId, current) {
-        const docRef = doc(db, `artifacts/${appId}/public/data/compras`, docId);
-        try {
-            await updateDoc(docRef, { agregado_sicar: !current });
-            showToast('Estado actualizado.', 'success');
-        } catch (error) {
-            showToast(`Error al actualizar: ${error.message}`, 'error');
+            loadingMessage.textContent = 'Carga de red fallida. Usando datos antiguos.';
+            setTimeout(() => loadingOverlay.classList.add('hidden'), 2000);
         }
+    } finally {
+        if (!loadingMessage.textContent.startsWith('Error') && !loadingMessage.textContent.includes('antiguos')) {
+            loadingOverlay.classList.add('hidden');
+        }
+        refreshSpinner.classList.add('hidden');
+        refreshCatalogBtn.disabled = false;
     }
+}
 
-    function showToast(message, type = 'success') {
-        const toast = document.createElement('div');
-        const bgColor = type === 'success' ? 'bg-emerald-500' : 'bg-red-500';
-        toast.className = `toast ${bgColor} text-white font-bold py-3 px-5 rounded-lg shadow-xl transform translate-y-4 opacity-0`;
-        toast.textContent = message;
-        toastContainer.appendChild(toast);
-        setTimeout(() => { toast.classList.remove('translate-y-4', 'opacity-0'); }, 10);
-        setTimeout(() => {
-            toast.classList.add('translate-y-4', 'opacity-0');
-            toast.addEventListener('transitionend', () => toast.remove());
-        }, 3000);
-    }
-
-    // --- INICIALIZACIÓN Y EVENT LISTENERS GLOBALES ---
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
         if (user) {
-            userId = user.uid;
-            listenToPurchases();
+            appShell.classList.remove('hidden');
+            await loadOrRefreshCatalog();
+            handleNavigation();
+        } else {
+            window.location.href = `login.html?redirect=${window.location.pathname}${window.location.hash || '#compras'}`;
         }
     });
 
-    (async () => {
-        try {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
-            }
-            // Cargar el catálogo al iniciar la app
-            await loadProductCatalog();
-        } catch (error) {
-            console.error("Error de autenticación inicial:", error);
-            showToast("No se pudo autenticar. La app podría no funcionar.", "error");
-        }
-    })();
+async function handleNavigation() {
+  const hash = window.location.hash || '#compras';
 
-    showRegisterFormBtn.addEventListener('click', showRegisterForm);
-    historySearch.addEventListener('input', applyHistoryFilters);
-    filterSucursal.addEventListener('change', applyHistoryFilters);
-    filterStart.addEventListener('change', applyHistoryFilters);
-    filterEnd.addEventListener('change', applyHistoryFilters);
-    filterStatus.addEventListener('change', applyHistoryFilters);
-    
-    function handleCopyClave(target) {
-        const clave = target.dataset.clave;
-        if (clave) {
-            navigator.clipboard.writeText(clave)
-                .then(() => showToast('Clave copiada.', 'success'))
-                .catch(err => showToast('Error al copiar.', 'error'));
-        }
+  // NUEVO: apps modulares → "#/algo"
+  if (hash.startsWith('#/')) {
+    const route = hash.slice(2); // 'plantilla', etc.
+    await router.mount(route);
+    // limpiar estado visual legacy
+    navLinks.forEach(l => l.classList.remove('active'));
+    if (navMenu.classList.contains('active')) navMenu.classList.remove('active');
+    return;
+  }
+
+  // Legacy intacto (tu código actual)
+  const link = document.querySelector(`.nav-link[href="${hash}"]`);
+  if (link) {
+    const pageUrl = link.getAttribute('data-page');
+    await loadContent(pageUrl, contentContainer);
+    navLinks.forEach(l => l.classList.remove('active'));
+    link.classList.add('active');
+    if (navMenu.classList.contains('active')) {
+      navMenu.classList.remove('active');
     }
+  }
+}
 
-    function handleCopyText(target) {
-        const text = target.dataset.copy;
-        if (text) {
-            navigator.clipboard.writeText(text)
-                .then(() => showToast('Copiado.', 'success'))
-                .catch(err => showToast('Error al copiar.', 'error'));
-        }
-    }
+    window.addEventListener('hashchange', handleNavigation);
+    refreshCatalogBtn.addEventListener('click', () => loadOrRefreshCatalog(true));
+    document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+    menuToggleBtn.addEventListener('click', () => navMenu.classList.toggle('active'));
 
-    document.addEventListener('click', (e) => {
-        if (e.target.closest('.view-details-btn')) {
-            const id = e.target.closest('.view-details-btn').dataset.id;
-            showDetails(id);
-        } else if (e.target.closest('.edit-btn')) {
-            const id = e.target.closest('.edit-btn').dataset.id;
-            showEditForm(id);
-        } else if (e.target.closest('.copy-clave-btn')) {
-            handleCopyClave(e.target.closest('.copy-clave-btn'));
-        } else if (e.target.closest('.copy-btn')) {
-            handleCopyText(e.target.closest('.copy-btn'));
-        }
-    });
-
-    closeModalBtn.addEventListener('click', () => {
-        detailsModal.classList.add('hidden');
-    });
 </script>
 </body>
 </html>
