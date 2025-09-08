@@ -175,18 +175,26 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
       </div>
       <div id="pagination-controls" class="p-2 border-t bg-white flex justify-between items-center text-sm"></div>
 
-<div class="p-3 border-t sticky bottom-0 bg-gray-50">
-  <div class="flex gap-2">
-    <button id="nav-my-orders-btn"
-            class="flex-1 bg-white border text-gray-700 font-medium py-2 px-3 rounded-lg hover:bg-gray-100">
-      Mis pedidos
-    </button>
-    <button id="save-order-btn"
-            class="flex-1 bg-emerald-600 text-white font-semibold py-2 px-3 rounded-lg hover:bg-emerald-700">
-      Guardar pedido (<span id="current-order-count">0</span>)
-    </button>
-  </div>
-</div>
+      <div class="p-3 border-t sticky bottom-0 bg-gray-50">
+        <div class="flex gap-2">
+          <button id="nav-my-orders-btn"
+                  class="flex-1 bg-white border text-gray-700 font-medium py-2 px-3 rounded-lg hover:bg-gray-100">
+            Mis pedidos
+          </button>
+          <button id="save-order-btn"
+                  class="flex-1 bg-emerald-600 text-white font-semibold py-2 px-3 rounded-lg hover:bg-emerald-700">
+            Guardar pedido (<span id="current-order-count">0</span>)
+          </button>
+        </div>
+      </div>
+
+      <div class="fixed bottom-6 right-6 z-50">
+        <div id="fab-menu" class="hidden mb-4 flex flex-col items-end space-y-2">
+          <button id="apply-suggestions-btn" class="px-4 py-2 rounded-lg bg-indigo-600 text-white shadow hover:bg-indigo-700">Aplicar sugeridos</button>
+          <button id="new-order-btn" class="px-4 py-2 rounded-lg bg-red-600 text-white shadow hover:bg-red-700">Nuevo pedido</button>
+        </div>
+        <button id="fab-main-btn" class="w-14 h-14 rounded-full bg-emerald-600 text-white shadow-lg flex items-center justify-center text-2xl">+</button>
+      </div>
 
     `;
 
@@ -196,6 +204,10 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
     const toolbarEl = container.querySelector('#toolbar');
     const paginationEl = container.querySelector('#pagination-controls');
     const currentOrderCountEl = container.querySelector('#current-order-count');
+    const fabMenuEl = container.querySelector('#fab-menu');
+    const fabMainBtn = container.querySelector('#fab-main-btn');
+    const applySuggestionsBtn = container.querySelector('#apply-suggestions-btn');
+    const newOrderBtn = container.querySelector('#new-order-btn');
 
     // Barra de búsqueda + botón de reposición
     const searchInput = SearchBar({
@@ -413,6 +425,46 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
         reorderFilterBtn.classList.toggle('bg-blue-100', reorderFilterActive);
         reorderFilterBtn.classList.toggle('text-blue-600', reorderFilterActive);
         applyFiltersAndRender();
+        persistState();
+      });
+
+      fabMainBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fabMenuEl.classList.toggle('hidden');
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!fabMenuEl.contains(e.target) && !fabMainBtn.contains(e.target)) {
+          fabMenuEl.classList.add('hidden');
+        }
+      });
+
+      applySuggestionsBtn.addEventListener('click', () => {
+        fabMenuEl.classList.add('hidden');
+        lastFilteredProducts.forEach((p) => {
+          const sugerida = p.kpis?.cantidadSugerida || 0;
+          if (sugerida > 0) {
+            const currentQty = Number(currentOrder.get(p.id)?.quantity) || 0;
+            if (!(currentQty > 0)) {
+              updateOrder(p.id, sugerida);
+            }
+          }
+        });
+      });
+
+      newOrderBtn.addEventListener('click', () => {
+        fabMenuEl.classList.add('hidden');
+        currentOrder.clear();
+        localStorage.removeItem('draftOrder');
+        updateOrderCount();
+        searchTerm = '';
+        searchInput.input.value = '';
+        selectedSupplierName = 'all';
+        supplierFilterEl.value = 'all';
+        reorderFilterActive = false;
+        reorderFilterBtn.classList.remove('bg-blue-100', 'text-blue-600');
+        currentPage = 1;
+        renderProductList();
         persistState();
       });
 
