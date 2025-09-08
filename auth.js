@@ -65,7 +65,17 @@ function setupLoginForm() {
             e.preventDefault();
             const email = loginForm.email.value;
             const password = loginForm.password.value;
+            if (!loginError) {
+                console.error("Error: No se encontró el contenedor de error de login.");
+                return;
+            }
             loginError.classList.add('hidden');
+
+            if (!email || !password) {
+                loginError.textContent = "Por favor, completa todos los campos.";
+                loginError.classList.remove('hidden');
+                return;
+            }
 
             try {
                 await signInWithEmailAndPassword(auth, email, password);
