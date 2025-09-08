@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner {
+            animation: spin 1s linear infinite;
+            border-color: rgba(255, 255, 255, 0.2);
+            border-top-color: white;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl transition-all">
+        <div class="text-center">
+            <h1 class="text-3xl font-bold text-slate-900 mb-2">Bienvenido de Nuevo</h1>
+            <p class="text-slate-500 mb-6">Ingresa tus credenciales para continuar</p>
+        </div>
+        
+        <form id="login-form" novalidate>
+            <div class="mb-4">
+                <label for="email" class="block text-sm font-medium text-slate-700 mb-1">Correo Electrónico</label>
+                <div class="relative">
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                        <svg class="h-5 w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                        </svg>
+                    </div>
+                    <input type="email" id="email" name="email" required placeholder="tu@email.com" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm p-3 pl-10 focus:border-emerald-500 focus:ring-emerald-500 transition">
+                </div>
+            </div>
+            
+            <div class="mb-6">
+                <label for="password" class="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
+                <div class="relative">
+                     <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                        <svg class="h-5 w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                           <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 00-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                     </div>
+                    <input type="password" id="password" name="password" required placeholder="••••••••" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm p-3 pl-10 focus:border-emerald-500 focus:ring-emerald-500 transition">
+                    <button type="button" id="toggle-password" class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600">
+                        <svg id="eye-icon" class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.432 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                         <svg id="eye-slash-icon" class="h-5 w-5 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.243 4.243L6.228 6.228" />
+                         </svg>
+                    </button>
+                </div>
+            </div>
+
+            <button type="submit" id="submit-button" class="mt-6 w-full flex justify-center items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500">
+                <span id="button-text">Entrar</span>
+                <div id="button-spinner" class="hidden spinner w-5 h-5 border-2 rounded-full"></div>
+            </button>
+            
+            <p id="login-error" class="text-red-500 text-sm text-center mt-4 hidden"></p>
+        </form>
+    </div>
+
+<script type="module">
+    // --- Importaciones ---
+    // Importa el servicio 'auth' ya inicializado desde el archivo central.
+    import { auth } from './firebase-init.js';
+    // Importa las funciones específicas de autenticación que usarás en esta página.
+    import { onAuthStateChanged, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+    // --- ELEMENTOS DEL DOM ---
+    const loginForm = document.getElementById('login-form');
+    const loginError = document.getElementById('login-error');
+    const submitButton = document.getElementById('submit-button');
+    const buttonText = document.getElementById('button-text');
+    const buttonSpinner = document.getElementById('button-spinner');
+    const passwordInput = document.getElementById('password');
+    const togglePasswordButton = document.getElementById('toggle-password');
+    const eyeIcon = document.getElementById('eye-icon');
+    const eyeSlashIcon = document.getElementById('eye-slash-icon');
+
+    // --- LÓGICA DE LA PÁGINA ---
+
+    // 1. Obtener la URL de redirección desde los parámetros de la URL.
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectUrl = urlParams.get('redirect') || '/index.html';
+
+    // 2. Observar el estado de la autenticación. Si el usuario ya tiene sesión, redirigir.
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            console.log('Usuario ya autenticado. Redirigiendo a:', redirectUrl);
+            window.location.href = redirectUrl;
+        }
+    });
+
+    // 3. Manejar el envío del formulario de inicio de sesión.
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = loginForm.email.value;
+        const password = loginForm.password.value;
+        
+        // Reiniciar UI para el intento de login
+        loginError.classList.add('hidden');
+        submitButton.disabled = true;
+        buttonText.classList.add('hidden');
+        buttonSpinner.classList.remove('hidden');
+
+        try {
+            // Intentar iniciar sesión con las credenciales proporcionadas.
+            await signInWithEmailAndPassword(auth, email, password);
+            // Si el login es exitoso, el 'onAuthStateChanged' de arriba se activará y manejará la redirección.
+        } catch (error) {
+            console.error("Error de inicio de sesión:", error);
+            loginError.textContent = "Correo o contraseña incorrectos.";
+            loginError.classList.remove('hidden');
+            
+            // Habilitar el botón nuevamente en caso de error
+            submitButton.disabled = false;
+            buttonText.classList.remove('hidden');
+            buttonSpinner.classList.add('hidden');
+        }
+    });
+
+    // 4. Lógica para el botón de mostrar/ocultar contraseña.
+    togglePasswordButton.addEventListener('click', () => {
+        const isPassword = passwordInput.type === 'password';
+        passwordInput.type = isPassword ? 'text' : 'password';
+        eyeIcon.classList.toggle('hidden', isPassword);
+        eyeSlashIcon.classList.toggle('hidden', !isPassword);
+    });
+</script>
+</body>
+</html>
