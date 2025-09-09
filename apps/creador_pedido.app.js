@@ -139,9 +139,10 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
       try {
         const draft = JSON.parse(savedDraft);
         for (const id in draft) {
-          const product = productCatalog.find((p) => p.id === id);
+          const idStr = String(id);
+          const product = productCatalog.find((p) => String(p.id) === idStr);
           if (product) {
-            currentOrder.set(id, { product, quantity: draft[id] });
+            currentOrder.set(idStr, { product, quantity: draft[id] });
           }
         }
       } catch (e) {
@@ -153,7 +154,7 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
     const saveDraftOrder = () => {
       const draftToSave = {};
       currentOrder.forEach((item, id) => {
-        draftToSave[id] = item.quantity;
+        draftToSave[String(id)] = item.quantity;
       });
       localStorage.setItem('draftOrder', JSON.stringify(draftToSave));
     };
@@ -237,13 +238,14 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
     }
 
     const updateOrder = (productId, quantity) => {
+      const idStr = String(productId);
       if (quantity > 0) {
-        const product = productCatalog.find((p) => p.id === productId);
+        const product = productCatalog.find((p) => String(p.id) === idStr);
         if (product) {
-          currentOrder.set(productId, { product, quantity });
+          currentOrder.set(idStr, { product, quantity });
         }
       } else {
-        currentOrder.delete(productId);
+        currentOrder.delete(idStr);
       }
       updateOrderCount();
       saveDraftOrder();
@@ -302,7 +304,7 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
     };
 
     const createProductRowHTML = (p) => {
-      const orderedItem = currentOrder.get(p.id);
+      const orderedItem = currentOrder.get(String(p.id));
       const isOrdered = !!orderedItem;
       const cantidadSugerida = p.kpis?.cantidadSugerida || 0;
 
@@ -444,7 +446,7 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
         lastFilteredProducts.forEach((p) => {
           const sugerida = p.kpis?.cantidadSugerida || 0;
           if (sugerida > 0) {
-            const currentQty = Number(currentOrder.get(p.id)?.quantity) || 0;
+            const currentQty = Number(currentOrder.get(String(p.id))?.quantity) || 0;
             if (!(currentQty > 0)) {
               updateOrder(p.id, sugerida);
             }
