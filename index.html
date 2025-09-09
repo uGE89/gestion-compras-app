@@ -97,11 +97,13 @@
 
 <script type="module">
     import { appState } from './state.js';
-    import { auth, db as firestoreDb } from './firebase-init.js';
+    import { auth, db as firestoreDb, storage as firebaseStorage } from './firebase-init.js';    
     import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { loadContent } from './app_loader.js';
     import { createRouter } from './framework/router-lite.js';
     import { registry } from './framework/registry.js';
+    import { env } from './env.js';
+    
 
 
     // Registro del Service Worker para caché de la app (sin cambios funcionales)
@@ -130,7 +132,7 @@
     const router = createRouter({
   container: contentContainer,
   registry,
-  deps: { appState, auth, db: firestoreDb },
+  deps: { appState, auth, db: firestoreDb, storage: firebaseStorage, env },  
   fallbackLoadContent: async (routeOrFile) => {
     const file = routeOrFile.endsWith('.html') ? routeOrFile : 'compras.html';
     await loadContent(file, contentContainer);
