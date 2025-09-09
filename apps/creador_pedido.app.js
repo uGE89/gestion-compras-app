@@ -310,16 +310,18 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
       const stocks = getStocksByBranch(p);
       const total = Number(p.stockTotal ?? stocks.reduce((acc, s) => acc + (Number(s.qty) || 0), 0));
 
+      // Botón "Usar sugerido"
       const sugeridoBtn = cantidadSugerida > 0
         ? `
         <button type="button"
-          class="sugerido-toggle-btn px-2 py-1 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-sm"
+          class="sugerido-toggle-btn rounded-lg bg-indigo-600 text-white text-sm px-3 py-2 hover:bg-indigo-700 shadow-sm"
           title="Usar sugerido: ${cantidadSugerida}"
           data-product-id="${p.id}" data-quantity="${cantidadSugerida}">
-          Sugerido
+          Usar sugerido (${cantidadSugerida})
         </button>`
         : '';
 
+      // Botón borrar rápido (solo si está en pedido)
       const quickClearBtn = isOrdered
         ? `
         <button type="button"
@@ -329,57 +331,79 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
         </button>`
         : '';
 
+      // Chips de stock por sucursal
       const stockChips = stocks.length
-        ? stocks
-            .map(
-              (s) => `
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
-            ${s.name}: <span class="ml-1 font-semibold">${Number(s.qty) || 0}</span>
-          </span>`
-            )
-            .join(' ')
+        ? stocks.map(s => `
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium
+                     bg-slate-100 text-slate-700 border border-slate-200">
+          ${s.name}: <span class="ml-1 font-semibold">${Number(s.qty) || 0}</span>
+        </span>
+      `).join(' ')
         : `<span class="text-[11px] text-slate-400">Sin desglose</span>`;
 
+      // Icono/aviso de riesgo
+      const riesgoIcon = p.kpis?.RiesgoRuptura
+        ? `<i class="fas fa-exclamation-triangle text-amber-500" title="Stock en riesgo"></i>`
+        : '';
+
+      // Placeholder del input cuando no hay cantidad
+      const placeholder = cantidadSugerida > 0 ? String(cantidadSugerida) : '0';
+
+      // --- CARD Diseño 2 dentro de la tabla ---
       return `
-        <tr class="border-b transition-colors ${isOrdered ? 'bg-blue-50' : 'hover:bg-gray-50'}" data-product-id="${p.id}">
-          <td class="p-3 align-top">
-            <div class="flex items-start justify-between gap-2">
-              <div>
-                <div class="font-semibold text-gray-800 flex items-center gap-2">
-                  ${p.nombre}
-                  ${p.kpis?.RiesgoRuptura ? '<i class="fas fa-exclamation-triangle text-yellow-500" title="Stock en riesgo"></i>' : ''}
-                </div>
-                <div class="mt-0.5 text-xs text-gray-500">
-                  Clave: <span class="font-medium text-gray-700">${p.clave}</span>
-                  <span class="mx-2 text-slate-300">•</span>
-                  Total: <span class="font-semibold">${Number.isFinite(total) ? total : '—'}</span>
-                </div>
-                <div class="mt-1 text-xs">
-                  <span class="text-slate-500">Costo:</span> <span class="font-semibold text-slate-700">${formatMoney(compra)}</span>
-                  <span class="mx-2 text-slate-300">•</span>
-                  <span class="text-slate-500">Venta:</span> <span class="font-semibold text-slate-700">${formatMoney(venta)}</span>
-                </div>
-                <div class="mt-2 flex flex-wrap gap-1">
-                  ${stockChips}
-                </div>
-              </div>
+    <tr class="transition-colors" data-product-id="${p.id}">
+      <td colspan="2" class="p-3">
+        <div class="rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow
+                    ${isOrdered ? 'ring-1 ring-indigo-200' : ''}">
+
+          <!-- Header -->
+          <div class="flex items-center justify-between gap-2 border-b bg-slate-50 px-3 py-2 rounded-t-2xl">
+            <div class="flex items-center gap-2 min-w-0">
+              <h3 class="font-semibold text-slate-800 truncate">${p.nombre}</h3>
+              ${riesgoIcon}
             </div>
-          </td>
-          <td class="p-3 align-top">
-            <div class="flex flex-col items-end justify-between h-full">
-              <div class="flex items-center gap-1">
-                ${quickClearBtn}
-                <input type="number" class="w-24 text-center border rounded-md p-1 quantity-input placeholder:text-gray-400"
-                  value="${isOrdered ? orderedItem.quantity : ''}"
-                  placeholder="${cantidadSugerida > 0 ? cantidadSugerida : '0'}"
-                  min="0" data-id="${p.id}">
-              </div>
-              <div class="mt-2">
+            <span class="text-xs text-slate-500 whitespace-nowrap">
+              Clave: <b class="text-slate-700">${p.clave}</b>
+            </span>
+          </div>
+
+          <!-- Body -->
+          <div class="px-3 py-2">
+            <!-- KPIs en píldoras -->
+            <div class="flex flex-wrap gap-2">
+              <span class="text-xs px-3 py-1 rounded-xl bg-slate-100">
+                Total: <b>${Number.isFinite(total) ? total : '—'}</b>
+              </span>
+              <span class="text-xs px-3 py-1 rounded-xl bg-slate-100">
+                Costo: <b>${formatMoney(compra)}</b>
+              </span>
+              <span class="text-xs px-3 py-1 rounded-xl bg-slate-100">
+                Venta: <b>${formatMoney(venta)}</b>
+              </span>
+            </div>
+
+            <!-- Chips de stock -->
+            <div class="mt-2 flex flex-wrap gap-1">
+              ${stockChips}
+            </div>
+
+            <!-- Acciones -->
+            <div class="mt-3 flex items-center justify-between gap-2">
+              <input type="number"
+                     class="w-28 text-center border rounded-lg py-1 px-2 quantity-input placeholder:text-gray-400"
+                     value="${isOrdered ? orderedItem.quantity : ''}"
+                     placeholder="${placeholder}"
+                     min="0" data-id="${p.id}">
+              <div class="flex items-center gap-2">
                 ${sugeridoBtn}
+                ${quickClearBtn}
               </div>
             </div>
-          </td>
-        </tr>`;
+          </div>
+        </div>
+      </td>
+    </tr>
+  `;
     };
 
     const populateSupplierFilter = () => {
@@ -424,6 +448,7 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
         reorderFilterActive = !reorderFilterActive;
         reorderFilterBtn.classList.toggle('bg-blue-100', reorderFilterActive);
         reorderFilterBtn.classList.toggle('text-blue-600', reorderFilterActive);
+        document.documentElement.classList.toggle('reorder-on', reorderFilterActive);
         applyFiltersAndRender();
         persistState();
       });
