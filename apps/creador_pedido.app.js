@@ -476,9 +476,8 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
       // Ir a la vista "Mis pedidos"
       container.querySelector('#nav-my-orders-btn')?.addEventListener('click', (e) => {
         e.preventDefault();
-        // Usa la vista legacy registrada en index.html
+        // Carga la micro-app registrada 'mis_pedidos'
         location.hash = '#/mis_pedidos';
-        // Si más adelante creas una app modular: location.hash = '#/mis-pedidos';
       });
 
       // Guardar pedido (Firestore con esquema del ejemplo)
