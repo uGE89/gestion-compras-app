@@ -104,7 +104,7 @@ export function ItemsEditor({
       <div id="ie-items-list" class="mt-4 space-y-4"></div>
 
       <div class="mt-4 flex items-center justify-between">
-        <button id="ie-add-item"
+        <button id="ie-add-item" type="button"
           class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg flex items-center">
           <span class="material-icons mr-2">add</span>Añadir Artículo
         </button>
