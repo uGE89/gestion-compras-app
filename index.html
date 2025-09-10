@@ -48,10 +48,10 @@
                 <div class="text-xl font-bold text-slate-800">Mi Empresa V2</div>
                 
                 <div id="nav-menu" class="nav-menu-mobile md:flex flex-grow justify-center space-x-4">
-                    <a href="#/compras_historial" data-page="compras_historial.apps.js" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Gestión de Compras</a>
+                    <a href="#/compras_historial" data-page="compras_historial.apps.js" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Compras</a>
                     <a href="#app_extraccion.html" data-page="app_extraccion.html" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Transferencias</a>
                     <a href="#/creador_pedido" data-page="creador_pedido.apps.js" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Pedidos</a>
-                    <a href="#analizador_cotizaciones.html" data-page="analizador_cotizaciones.html" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Analizador de Cotizaciones</a>
+                    <a href="#/cotizaciones_historial" data-page="cotizaciones_historial.apps.js" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Cotizaciones</a>
                     <a href="#app_historial_transferencias.html" data-page="app_historial_transferencias.html" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Historial Transferencias</a>
                 </div>
 
@@ -87,16 +87,16 @@
     <!-- Barra inferior para móvil (no afecta la lógica; enlaces por hash) -->
     <nav class="bottom-nav md:hidden bg-white border-t border-slate-200">
         <div class="grid grid-cols-5 text-xs text-slate-600">
-            <a class="flex flex-col items-center py-2" href="#compras" data-page="compras.html"><span class="material-icons">shopping_cart</span><span>Compras</span></a>
+            <a class="flex flex-col items-center py-2" href="#/compras_historial" data-page="compras_historial.apps.js"><span class="material-icons">shopping_cart</span><span>Compras</span></a>
             <a class="flex flex-col items-center py-2" href="#app_extraccion.html" data-page="app_extraccion.html"><span class="material-icons">compare_arrows</span><span>Transf.</span></a>
-            <a class="flex flex-col items-center py-2" href="#app_pedidos_movil.html" data-page="app_pedidos_movil.html"><span class="material-icons">playlist_add</span><span>Pedidos</span></a>
-            <a class="flex flex-col items-center py-2" href="#analizador_cotizaciones.html" data-page="analizador_cotizaciones.html"><span class="material-icons">request_quote</span><span>Cotiz.</span></a>
+            <a class="flex flex-col items-center py-2" href="#/creador_pedido" data-page="creador_pedido.apps.js"><span class="material-icons">playlist_add</span><span>Pedidos</span></a>
+            <a class="flex flex-col items-center py-2" href="#/cotizaciones_historial" data-page="cotizaciones_historial.apps.js"><span class="material-icons">request_quote</span><span>Cotiz.</span></a>
             <a class="flex flex-col items-center py-2" href="#app_historial_transferencias.html" data-page="app_historial_transferencias.html"><span class="material-icons">history</span><span>Historial</span></a>
         </div>
     </nav>
 
 <script type="module">
-    import { appState } from './state.js';
+    import { appState, hydrateDrafts, savePedidoDraft, saveCotizacionDraft } from './state.js';
     import { auth, db as firestoreDb, storage as firebaseStorage } from './firebase-init.js';    
     import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { loadContent } from './app_loader.js';
@@ -342,15 +342,17 @@
     }
 }
 
-    onAuthStateChanged(auth, async (user) => {
-        if (user) {
-            appShell.classList.remove('hidden');
-            await loadOrRefreshCatalog();
-            handleNavigation();
-        } else {
-            window.location.href = `login.html?redirect=${window.location.pathname}${window.location.hash || '#compras'}`;
-        }
-    });
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    hydrateDrafts();                 // ⬅️ aquí
+    appShell.classList.remove('hidden');
+    await loadOrRefreshCatalog();
+    handleNavigation();
+  } else {
+    window.location.href = `login.html?redirect=${window.location.pathname}${window.location.hash || '#compras'}`;
+  }
+}); 
+
 
 async function handleNavigation() {
   const hash = window.location.hash || '#compras';
@@ -382,6 +384,19 @@ async function handleNavigation() {
     refreshCatalogBtn.addEventListener('click', () => loadOrRefreshCatalog(true));
     document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
     menuToggleBtn.addEventListener('click', () => navMenu.classList.toggle('active'));
+
+
+window.addEventListener('beforeunload', () => {
+  savePedidoDraft();
+  saveCotizacionDraft();
+});
+
+window.addEventListener('storage', (e) => {
+  if (e.key === 'pedidoDraft:v1' || e.key === 'cotizacionDraft:v1') {
+    hydrateDrafts();
+  }
+});
+
 
 </script>
 </body>
