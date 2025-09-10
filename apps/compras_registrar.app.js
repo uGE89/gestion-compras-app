@@ -154,7 +154,7 @@ export default {
             </div>
             <div>
               <label class="block text-sm text-slate-700">Monto Total (Factura)</label>
-              <input id="total" type="number" step="0.01" class="p-2 border rounded w-full bg-slate-100" readonly>
+              <input id="total" type="number" step="0.01" class="p-2 border rounded w-full">
             </div>
             <div>
               <label class="block text-sm text-slate-700">Sucursal</label>
@@ -192,6 +192,12 @@ export default {
       initialTC: 1,
       initialTotalAI: 0,
       onChange: () => {}
+    });
+
+    // Permitir editar manualmente el monto total de la factura
+    $('#total', root).addEventListener('input', (e) => {
+      totalFacturaAI = parseLocalFloat(e.target.value);
+      itemsEditor.setInvoiceTotal(totalFacturaAI);
     });
 
     // ===== Subida + IA + Mapeo (ANEXAR SIEMPRE) =====
