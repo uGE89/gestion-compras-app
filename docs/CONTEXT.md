@@ -54,16 +54,14 @@ if (window.Chart && window.ChartDataLabels) {
 }
 Instanciar: new window.Chart(canvas, { ... }).
 
-Service Worker (SW) y Caché
-SW tipo app-shell con CACHE_NAME.
-
-Para forzar actualización:
-
-Cambiar CACHE_NAME en service-worker.js y recargar fuerte.
-
-O usar estrategia network-first para HTML si se decide.
-
-No confundir la caché del SW con IndexedDB (datos del catálogo).
+## Service Worker
+- `service-worker.js` usa la variable `APP_VERSION` para generar `CACHE_NAME`.
+- Cambiar `APP_VERSION` en cada deploy invalida la caché previa y descarga archivos nuevos.
+- Estrategias:
+  - *network-first*: intenta la red primero y usa la caché como respaldo; asegura contenido fresco pero depende de la conexión.
+  - *cache-first*: sirve desde caché y actualiza en segundo plano; mejora rendimiento y soporte offline pero puede entregar recursos viejos.
+- Para aplicar una actualización sin esperar, la página puede enviar `postMessage({ type: 'SKIP_WAITING' })` al SW en espera.
+- No confundir la caché del SW con IndexedDB (datos del catálogo).
 
 Hosting y Despliegue
 Firebase Hosting (firebase.json mínimo con rewrites a index.html).
