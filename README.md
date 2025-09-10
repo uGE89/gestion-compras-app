@@ -23,4 +23,18 @@ El despliegue se realiza en **Firebase Hosting**:
 ```bash
 firebase deploy
 ```
-El archivo [service-worker.js](service-worker.js) se encarga de la caché y actualizaciones de recursos en producción.
+
+## Service Worker
+
+El archivo [service-worker.js](service-worker.js) controla la caché del "app shell". Define la constante
+`APP_VERSION`, usada para construir el nombre del caché (`gestion-compras-cache-<versión>`). Cambiar
+este valor en cada despliegue fuerza la creación de un caché nuevo e invalida recursos antiguos.
+
+El script implementa una estrategia **network-first** para HTML, JS y CSS, lo que prioriza obtener
+los archivos más recientes de la red y solo cae al caché si no hay conexión. Para imágenes y otros
+activos estáticos utiliza **cache-first**, entregando respuestas rápidas a costa de poder servir
+contenido desactualizado.
+
+Para aplicar inmediatamente una nueva versión, la aplicación puede enviar
+`postMessage({ type: 'SKIP_WAITING' })` al Service Worker, provocando que la actualización se active
+sin esperar a que el usuario recargue manualmente.
