@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Transferencias</title>
+    <style>
+        .hidden { display: none; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner { animation: spin 1s linear infinite; }
+        .modal-hidden { display: none; }
+        .modal-visible { display: flex; }
+        /* Estilo para campos deshabilitados */
+        input:disabled, select:disabled, textarea:disabled {
+            background-color: #f3f4f6;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        /* Estilos de impresión */
+        @media print {
+            body * { visibility: hidden; }
+            .printable-area, .printable-area * { visibility: visible; -webkit-print-color-adjust: exact; color-adjust: exact; }
+            .printable-area { display: block !important; position: absolute; left: 0; top: 0; width: 100%; }
+            .print-flex-container { display: flex !important; flex-direction: row !important; gap: 1.5rem !important; }
+            .print-flex-col-1 { width: 41.666667% !important; }
+            .print-flex-col-2 { width: 58.333333% !important; }
+            .printable-area img { max-height: 90vh; width: 100%; object-fit: contain; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-6 max-w-6xl">
+        <header class="flex flex-col md:flex-row justify-between items-center mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-900">Historial de Transferencias</h1>
+                <p class="text-slate-500 mt-1">Consulta, filtra, edita y aprueba los registros existentes.</p>
+            </div>
+        </header>
+
+        <main id="history-section" class="bg-white p-6 md:p-8 rounded-2xl shadow-xl">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4">Registros</h2>
+            <div id="filters" class="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6 items-end">
+                <div class="md:col-span-3"><label for="general-search" class="block text-sm font-medium text-slate-700">Buscar</label><input type="text" id="general-search" placeholder="Buscar..." class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
+                <div class="md:col-span-2"><label for="filter-start-date" class="block text-sm font-medium text-slate-700">Fecha inicio</label><input type="date" id="filter-start-date" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
+                <div class="md:col-span-2"><label for="filter-end-date" class="block text-sm font-medium text-slate-700">Fecha fin</label><input type="date" id="filter-end-date" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"></div>
+                <div class="md:col-span-1"><label for="filter-bank" class="block text-sm font-medium text-slate-700">Banco</label><select id="filter-bank" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"><option value="">Todos</option></select></div>
+                <div class="md:col-span-2"><label for="filter-status" class="block text-sm font-medium text-slate-700">Estado</label><select id="filter-status" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2"><option value="">Todos</option><option value="approved">Aprobado</option><option value="pending_review">Pendiente</option></select></div>
+            </div>
+            <div id="history-list" class="space-y-4">
+                <div id="history-loader" class="flex items-center justify-center py-10">
+                    <div class="spinner w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full"></div>
+                    <p class="ml-4 text-slate-500">Cargando registros...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <div id="confirmation-modal" style="display: none;" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <h3 id="confirmation-title" class="text-lg font-bold text-slate-800">Confirmar Acción</h3>
+            <p id="confirmation-message" class="text-slate-600 mt-2 mb-6">¿Estás seguro?</p>
+            <div class="flex justify-end gap-4">
+                <button id="confirm-cancel-btn" class="px-4 py-2 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg">Cancelar</button>
+                <button id="confirm-ok-btn" class="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50"></div>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+
+<script type="module">
+    import { auth, db } from './firebase-init.js';
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { collection, onSnapshot, doc, deleteDoc, query, orderBy, serverTimestamp, getDoc, updateDoc, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    function initHistoryApp() {
+        const transfersCollection = collection(db, 'transferencias');
+        const alegraContactsCollection = collection(db, 'alegra_contacts');
+        const alegraCategoriesCollection = collection(db, 'alegra_categories');
+        let userId = null;
+        let unsubscribeTransfers = null;
+        let alegraContactsCache = [];
+        let alegraCategoriesCache = [];
+        let allTransfers = [];
+        const USD_TO_NIO_RATE = 36.6;
+                    const accountMappingsArray = [
+                        { id: 5, name: "Ahorro Dólares CEF", color: "#388E3C", moneda: "USD" },
+                        { id: 4, name: "Ahorro Dólares EFV", color: "#388E3C", moneda: "USD" },
+                        { id: 12, name: "Banpro ahorro", color: "#6EA8FE", moneda: "NIO" },
+                        { id: 11, name: "Banpro Comercial", color: "#6EA8FE", moneda: "NIO" },
+                        { id: 14, name: "Caja Bodegón", color: "#81C784", moneda: "NIO" },
+                        { id: 1, name: "Caja central", color: "#2196F3", moneda: "NIO" },
+                        { id: 10, name: "Caja Coperna", color: "#4CAF50", moneda: "NIO" },
+                        { id: 6, name: "Caja Principal", color: "#1976D2", moneda: "NIO" },
+                        { id: 8, name: "Caja Sucursal", color: "#FFC107", moneda: "NIO" },
+                        { id: 9, name: "Caja Uge", color: "#FF9800", moneda: "NIO" },
+                        { id: 7, name: "Comodín", color: "#9E9E9E", moneda: "NIO" },
+                        { id: 2, name: "Cuenta corriente Bancentro", color: "#388E3C", moneda: "NIO" },
+                        { id: 13, name: "Efectivo POS - Terminal Coperna", color: "#795548", moneda: "NIO" },
+                        { id: 3, name: "Tarjeta de crédito 1", color: "#388E3C", moneda: "NIO" },
+                        { id: 15, name: "BAC córdobas", color: "#D32F2F", moneda: "NIO" }
+                    ];
+        const historyList = document.getElementById('history-list');
+        const historyLoader = document.getElementById('history-loader');
+        const filterStartDate = document.getElementById('filter-start-date');
+        const filterEndDate = document.getElementById('filter-end-date');
+        const filterBank = document.getElementById('filter-bank');
+        const filterStatus = document.getElementById('filter-status');
+        const generalSearchInput = document.getElementById('general-search');
+        
+        const confirmationModal = {
+            element: document.getElementById('confirmation-modal'),
+            message: document.getElementById('confirmation-message'),
+            okBtn: document.getElementById('confirm-ok-btn'),
+            cancelBtn: document.getElementById('confirm-cancel-btn'),
+            onConfirmCallback: null,
+            init() { this.cancelBtn.addEventListener('click', () => this.hide()); this.okBtn.addEventListener('click', () => { if (this.onConfirmCallback) this.onConfirmCallback(); this.hide(); }); this.element.addEventListener('click', (e) => { if (e.target === this.element) this.hide(); }); },
+            show(message, onConfirm) { this.message.textContent = message; this.onConfirmCallback = onConfirm; this.element.style.display = 'flex'; },
+            hide() { this.element.style.display = 'none'; }
+        };
+        confirmationModal.init();
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) { userId = user.uid; loadInitialData(); }
+        });
+
+        async function loadInitialData() {
+            try {
+                const [contactsSnap, categoriesSnap] = await Promise.all([ getDocs(query(alegraContactsCollection)), getDocs(query(alegraCategoriesCollection)) ]);
+                alegraContactsCache = contactsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                alegraCategoriesCache = categoriesSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                if (unsubscribeTransfers) unsubscribeTransfers();
+                unsubscribeTransfers = onSnapshot(query(transfersCollection, orderBy("createdAt", "desc")), (snapshot) => {
+                    historyLoader.classList.add('hidden');
+                    allTransfers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    populateBankFilter();
+                    applyFilters();
+                });
+            } catch (error) { console.error("Error cargando datos:", error); showToast("Error al cargar datos.", "error"); }
+        }
+        
+        async function createMirrorTransaction(originalData, mirrorBankAccountId, originalDocId) {
+            const mirrorAccount = accountMappingsArray.find(acc => acc.id === mirrorBankAccountId);
+            if (!mirrorAccount) return null;
+
+            const mirrorData = {
+                ...originalData, // Copia campos como fecha, cantidad, moneda, etc.
+                tipo: originalData.tipo === 'in' ? 'out' : 'in', // Invierte el tipo
+                observaciones: `Contrapartida de transferencia. Ref: ${originalDocId.substring(0, 5)}`,
+                // Se replican los IDs de Alegra, como solicitaste.
+                alegraContactId: originalData.alegraContactId,
+                alegraCategoryId: originalData.alegraCategoryId,
+                bankAccountId: mirrorBankAccountId,
+                banco: mirrorAccount.name,
+                color: mirrorAccount.color,
+                status: 'pending_review', // El espejo se crea como APROBADO automáticamente.
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                isMirror: true, // Bandera para identificarlo como espejo
+                originalTransactionId: originalDocId // Enlace al registro original
+            };
+            const mirrorDocRef = await addDoc(transfersCollection, mirrorData);
+            return mirrorDocRef.id;
+        }
+
+        async function handleFormSubmit(form, docId) {
+            const submitButton = form.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            try {
+                const bankAccountId = parseInt(form['bank-select'].value);
+                const selectedAccount = accountMappingsArray.find(acc => acc.id === bankAccountId);
+                const transferData = {
+                    fecha: form.fecha.value,
+                    cantidad: cleanAmount(form.cantidad.value),
+                    moneda: form.moneda.value,
+                    tipo: form.tipo.value,
+                    numero_confirmacion: form.numero_confirmacion.value.trim(),
+                    observaciones: form.observaciones.value.trim(),
+                    alegraContactId: form.querySelector('#alegra-contact-id')?.value || null,
+                    alegraCategoryId: form.querySelector('#alegra-category-id')?.value || null,
+                    bankAccountId,
+                    banco: selectedAccount?.name || 'N/A',
+                    color: selectedAccount?.color || '#9E9E9E',
+                    updatedAt: serverTimestamp(),
+                    userId: userId,
+                };
+                transferData.cantidadNIO = transferData.moneda === 'USD' ? transferData.cantidad * USD_TO_NIO_RATE : transferData.cantidad;
+                
+                const docRef = doc(db, transfersCollection.path, docId);
+                const isInternal = form.querySelector('#internal-transfer-toggle')?.checked;
+                const currentDocSnap = await getDoc(docRef);
+                const currentData = currentDocSnap.data() || {};
+
+                // Lógica para crear el espejo si está marcado y no tiene uno ya asociado
+                if (isInternal && !currentData.originalTransactionId && !currentData.mirrorTransactionId) {
+                    const mirrorBankAccountId = parseInt(form['mirror-bank-select'].value);
+                    if (mirrorBankAccountId && mirrorBankAccountId !== transferData.bankAccountId) {
+                        const mirrorId = await createMirrorTransaction(transferData, mirrorBankAccountId, docId);
+                        if (mirrorId) {
+                            transferData.mirrorTransactionId = mirrorId; // Enlaza el original con el espejo
+                            showToast('Registro actualizado y espejo creado.', 'success');
+                        }
+                    } else {
+                         showToast('Actualizado. No se creó espejo (misma cuenta o no seleccionada).', 'info');
+                    }
+                } else {
+                    showToast('Registro actualizado.', 'success');
+                }
+
+                await updateDoc(docRef, transferData);
+                document.getElementById(`detail-container-${docId}`).innerHTML = '';
+                document.getElementById(`detail-container-${docId}`).classList.add('hidden');
+            } catch (error) { console.error("Error al actualizar:", error); showToast(`Error: ${error.message}`, 'error');
+            } finally { submitButton.disabled = false; }
+        }
+        
+        function applyFilters() {
+            const startDate = filterStartDate.value;
+            const endDate = filterEndDate.value;
+            const bankId = filterBank.value;
+            const status = filterStatus.value;
+            const term = generalSearchInput.value.trim().toLowerCase();
+            const filtered = allTransfers.filter(t => {
+                const dateValue = t.fecha ? new Date(t.fecha + 'T00:00:00') : (t.createdAt?.toDate ? t.createdAt.toDate() : null);
+                if (startDate && dateValue && dateValue < new Date(startDate + 'T00:00:00')) return false;
+                if (endDate && dateValue && dateValue > new Date(endDate + 'T23:59:59')) return false;
+                if (bankId && String(t.bankAccountId || '') !== bankId) return false;
+                if (status && t.status !== status) return false;
+                if (term) {
+                    const contact = alegraContactsCache.find(c => c.id === t.alegraContactId);
+                    const category = alegraCategoriesCache.find(c => c.id === t.alegraCategoryId);
+                    const haystack = [t.observaciones, t.banco, t.numero_confirmacion, String(t.cantidad), contact?.name, category?.name].join(' ').toLowerCase();
+                    if (!haystack.includes(term)) return false;
+                }
+                return true;
+            });
+            renderHistory(filtered);
+        }
+        
+        function renderHistory(list) {
+            if (!list.length) {
+                historyList.innerHTML = '<p class="text-center text-slate-500 py-8">No se encontraron registros.</p>';
+                return;
+            }
+            const groupedByDate = list.reduce((acc, t) => {
+                const dateKey = t.fecha || (t.createdAt?.toDate ? t.createdAt.toDate().toISOString().split('T')[0] : 'sin-fecha');
+                if (!acc[dateKey]) acc[dateKey] = [];
+                acc[dateKey].push(t);
+                return acc;
+            }, {});
+            const sortedDates = Object.keys(groupedByDate).sort((a, b) => new Date(b) - new Date(a));
+            const htmlChunks = sortedDates.map(dateKey => {
+                const dateHeader = `<div class="text-lg font-bold text-slate-600 py-2 sticky top-0 bg-slate-100/80 backdrop-blur-sm z-10">${formatDateHeader(dateKey)}</div>`;
+                const transactionsHtml = groupedByDate[dateKey].map(t => {
+                    const statusBarColor = t.status === 'pending_review' ? 'bg-amber-400' : 'bg-green-500';
+                    const typeColor = t.tipo === 'in' ? 'text-green-600' : 'text-red-600';
+                    const bancoName = t.banco || 'N/A';
+                    const bancoColor = t.color || '#9E9E9E';
+                    const statusTag = t.status === 'pending_review' ? `<span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">Pendiente</span>` : `<span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-semibold">Aprobado</span>`;
+                    const contactName = alegraContactsCache.find(c => c.id === t.alegraContactId)?.name || 'N/A';
+                    const categoryName = alegraCategoriesCache.find(c => c.id === t.alegraCategoryId)?.name || 'N/A';
+                    const mirrorTag = t.isMirror ? `<span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 font-semibold">Espejo</span>` : '';
+                    const hasMirror = t.mirrorTransactionId || t.originalTransactionId;
+                    const editButtonText = hasMirror ? 'Ver' : 'Revisar';
+                    const editButtonIcon = hasMirror ? 'visibility' : 'edit';
+                    const editButtonClass = hasMirror ? 'view-btn bg-sky-100 hover:bg-sky-200 text-sky-800' : 'edit-btn bg-blue-100 hover:bg-blue-200 text-blue-800';
+                    const formattedDate = t.fecha ? new Date(t.fecha + 'T00:00:00').toLocaleDateString('es-ES') : 'N/A';
+                    const nioAmount = t.moneda === 'USD' ? (t.cantidad || 0) * USD_TO_NIO_RATE : (t.cantidad || 0);
+                    const amountHtml = t.moneda === 'USD' ? `<span class="font-bold ${typeColor}">${(t.cantidad || 0).toFixed(2)} USD (C$${nioAmount.toFixed(2)})</span>` : `<span class="font-bold ${typeColor}">C$${nioAmount.toFixed(2)}</span>`;
+                    
+                    let extraInfoHtml = '';
+                    if (t.status === 'approved') {
+                        if (t.numero_confirmacion) extraInfoHtml += ` | <span class="font-medium">Conf:</span> ${t.numero_confirmacion}`;
+                        if (t.alegraPaymentId) extraInfoHtml += ` | <span class="font-medium">Alegra ID:</span> ${t.alegraPaymentId}`;
+                    }
+                    return `
+                        <div class="transaction-card bg-white rounded-lg shadow-sm overflow-hidden border border-slate-200">
+                            <div class="p-4 flex flex-col sm:flex-row justify-between items-start gap-4">
+                                <div class="flex items-center gap-4 flex-grow">
+                                    <div class="${statusBarColor} w-2 h-full self-stretch rounded-full flex-shrink-0"></div>
+                                    <div>
+                                        <p class="font-bold text-lg flex items-center" style="color:${bancoColor};">${bancoName} ${statusTag} ${mirrorTag}</p>
+                                        <p class="text-sm text-slate-500"><span class="font-medium">Fecha:</span> ${formattedDate} | ${amountHtml}${extraInfoHtml}</p>
+                                        <p class="text-xs text-slate-600 mt-1"><span class="font-medium">Contacto:</span> ${contactName} | <span class="font-medium">Categoría:</span> ${categoryName}</p>
+                                    </div>
+                                </div>
+                                <div class="flex-shrink-0 self-end sm:self-center flex items-center gap-2">
+                                    ${t.status === 'pending_review' && !hasMirror ?
+                                        `<button data-id="${t.id}" class="${editButtonClass} font-bold py-2 px-3 rounded-lg text-sm flex items-center gap-1"><span class="material-icons text-base">${editButtonIcon}</span> ${editButtonText}</button>` :
+                                        `<button data-id="${t.id}" class="view-btn bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold py-2 px-3 rounded-lg text-sm flex items-center gap-1"><span class="material-icons text-base">visibility</span> Ver</button>`
+                                    }
+                                    ${t.status !== 'approved' ? `<button data-id="${t.id}" class="approve-btn bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold py-2 px-3 rounded-lg text-sm flex items-center gap-1"><span class="material-icons text-base">check_circle</span> Aprobar</button>` : ''}
+                                    <button data-id="${t.id}" class="print-btn bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium p-2 rounded-lg text-sm"><span class="material-icons text-base">print</span></button>
+                                    <button data-id="${t.id}" class="delete-btn bg-red-100 hover:bg-red-200 text-red-700 font-medium p-2 rounded-lg text-sm"><span class="material-icons text-base">delete</span></button>
+                                </div>
+                            </div>
+                            <div id="detail-container-${t.id}" class="hidden bg-slate-50 border-t"></div>
+                        </div>`;
+                }).join('');
+                return dateHeader + transactionsHtml;
+            });
+            historyList.innerHTML = DOMPurify.sanitize(htmlChunks.join(''), {ADD_TAGS: ['option', 'datalist', 'input'], ADD_ATTR: ['data-id', 'style', 'list']});
+        }
+        
+        historyList.addEventListener('click', async (e) => {
+            const button = e.target.closest('button[data-id], a[data-id]');
+            if (!button) return;
+            const id = button.dataset.id;
+            const data = allTransfers.find(t => t.id === id);
+            if (!data) return;
+            const container = document.getElementById(`detail-container-${id}`);
+            if (!container) return;
+            
+            const isVisible = !container.classList.contains('hidden');
+            const shouldBeEditable = button.classList.contains('edit-btn');
+            
+            // Oculta otros contenedores
+            document.querySelectorAll('[id^="detail-container-"]').forEach(c => {
+                if (c.id !== container.id) {
+                    c.classList.add('hidden');
+                    c.innerHTML = '';
+                }
+            });
+            
+            if (button.classList.contains('edit-btn') || button.classList.contains('view-btn')) {
+                // Si el contenedor ya está abierto, lo cierra. Si no, lo abre con la vista correcta.
+                if (isVisible) {
+                    container.classList.add('hidden');
+                    container.innerHTML = '';
+                } else {
+                    container.innerHTML = generateDetailViewHTML(data, shouldBeEditable);
+                    container.classList.remove('hidden');
+                    setupDetailViewListeners(container, data.id);
+                }
+            } else if (button.classList.contains('print-btn')) {
+                container.innerHTML = generateDetailViewHTML(data, false); // Genera la vista de solo lectura
+                
+                // Espera un momento para que la imagen cargue antes de imprimir
+                setTimeout(() => {
+                    window.print();
+                    container.innerHTML = ''; // Limpia el contenedor después de imprimir
+                    container.classList.add('hidden'); // Oculta el contenedor
+                }, 250);
+            } else if (button.classList.contains('approve-btn')) {
+                confirmationModal.show('¿Estás seguro de que quieres aprobar este registro?', async () => {
+                    await updateDoc(doc(db, transfersCollection.path, id), { status: 'approved', updatedAt: serverTimestamp() });
+                    showToast('Registro aprobado.', 'success');
+                });
+            } else if (button.classList.contains('delete-btn')) {
+                confirmationModal.show('¿Estás seguro de que quieres eliminar este registro?', async () => {
+                    await deleteDoc(doc(db, transfersCollection.path, id));
+                    showToast('Registro eliminado.', 'success');
+                });
+            }
+        });
+        
+        function setupDetailViewListeners(container, docId) {
+            const form = container.querySelector('.transfer-form');
+            if (form) {
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    handleFormSubmit(e.target, docId);
+                });
+                
+                const cancelButton = container.querySelector('.cancel-register-btn');
+                if (cancelButton) {
+                    cancelButton.addEventListener('click', () => {
+                        container.classList.add('hidden');
+                        container.innerHTML = '';
+                    });
+                }
+            }
+            
+            const internalTransferToggle = container.querySelector('#internal-transfer-toggle');
+            const internalTransferFields = container.querySelector('#internal-transfer-fields');
+
+            function toggleInternalFields() {
+                if (internalTransferToggle && internalTransferToggle.checked) {
+                    if(internalTransferFields) internalTransferFields.classList.remove('hidden');
+                } else {
+                    if(internalTransferFields) internalTransferFields.classList.add('hidden');
+                }
+            }
+
+            if (internalTransferToggle) {
+                internalTransferToggle.addEventListener('change', toggleInternalFields);
+                // Establece el estado inicial cuando se carga el formulario
+                toggleInternalFields();
+            }
+
+            const inputContact = container.querySelector('.alegra-contact-input');
+            const listContact = container.querySelector(`.alegra-contact-list`);
+            const inputCategory = container.querySelector('.alegra-category-input');
+            const listCategory = container.querySelector(`.alegra-category-list`);
+            
+            if (inputContact && listContact) {
+                listContact.innerHTML = alegraContactsCache.map(item => `<option value="${DOMPurify.sanitize(item.name)}" data-id="${DOMPurify.sanitize(item.id)}"></option>`).join('');
+                inputContact.addEventListener('input', () => {
+                    const selectedOption = listContact.querySelector(`option[value="${inputContact.value}"]`);
+                    container.querySelector('#alegra-contact-id').value = selectedOption ? selectedOption.dataset.id : '';
+                });
+            }
+            
+            if (inputCategory && listCategory) {
+                listCategory.innerHTML = alegraCategoriesCache.map(item => `<option value="${DOMPurify.sanitize(item.name)}" data-id="${DOMPurify.sanitize(item.id)}"></option>`).join('');
+                inputCategory.addEventListener('input', () => {
+                    const selectedOption = listCategory.querySelector(`option[value="${inputCategory.value}"]`);
+                    container.querySelector('#alegra-category-id').value = selectedOption ? selectedOption.dataset.id : '';
+                });
+            }
+        }
+        
+        function generateDetailViewHTML(data = {}, isEditable = false) {
+            const disabledAttr = isEditable ? '' : 'disabled';
+            const buttonVisibility = isEditable ? '' : 'hidden';
+            const isPaired = data.isMirror || data.mirrorTransactionId || data.originalTransactionId;
+            const internalToggleDisabled = isPaired || !isEditable ? 'disabled' : '';
+            const internalToggleChecked = isPaired ? 'checked' : '';
+            const toggleVisibility = isEditable ? '' : 'hidden';
+
+            const formattedDate = data.fecha || '';
+            const cantidad = (Number(data.cantidad) || 0);
+            const numeroConfirmacion = data.numero_confirmacion || '';
+            const observaciones = data.observaciones || '';
+            const imageUrl = data.imageUrl || '';
+            
+            const alegraContact = alegraContactsCache.find(c => c.id === data.alegraContactId)?.name || '';
+            const alegraCategory = alegraCategoriesCache.find(c => c.id === data.alegraCategoryId)?.name || '';
+
+            return `
+                <div class="p-6 bg-slate-50 border-t printable-area">
+                    <div class="flex flex-col lg:flex-row gap-8 print-flex-container">
+                        <div class="w-full lg:w-5/12 print-flex-col-1">
+                            <h3 class="font-bold text-slate-800 mb-2 no-print">Comprobante</h3>
+                            <img src="${DOMPurify.sanitize(imageUrl)}" alt="Comprobante" class="w-full h-auto object-contain rounded-lg border p-2 bg-white"/>
+                        </div>
+                        <div class="w-full lg:w-7/12 print-flex-col-2">
+                            <form class="transfer-form space-y-4">
+                                <div class="flex justify-between items-center no-print">
+                                    <h3 class="font-bold text-slate-800">${isEditable ? 'Editando Registro' : 'Detalles del Registro'}</h3>
+                                    <button type="button" class="cancel-register-btn text-sm font-medium text-slate-600 hover:text-slate-900">Cerrar</button>
+                                </div>
+                                <div class="flex items-center gap-2 no-print ${toggleVisibility}">
+                                    <input type="checkbox" id="internal-transfer-toggle" class="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" ${internalToggleDisabled} ${internalToggleChecked}>
+                                    <label for="internal-transfer-toggle" class="font-medium text-slate-700">Es transferencia interna (crear registro espejo)</label>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-4">
+                                    <div>
+                                        <label class="text-sm font-medium text-slate-700">Contacto (Alegra)</label>
+                                        <input class="alegra-contact-input mt-1 block w-full rounded-md border-slate-300 p-2" list="alegra-contact-list-${data.id}" value="${DOMPurify.sanitize(alegraContact)}" ${disabledAttr}>
+                                        <datalist id="alegra-contact-list-${data.id}" class="alegra-contact-list"></datalist>
+                                        <input type="hidden" id="alegra-contact-id" value="${data.alegraContactId || ''}">
+                                    </div>
+                                    <div>
+                                        <label class="text-sm font-medium text-slate-700">Categoría (Alegra)</label>
+                                        <input class="alegra-category-input mt-1 block w-full rounded-md border-slate-300 p-2" list="alegra-category-list-${data.id}" value="${DOMPurify.sanitize(alegraCategory)}" ${disabledAttr}>
+                                        <datalist id="alegra-category-list-${data.id}" class="alegra-category-list"></datalist>
+                                        <input type="hidden" id="alegra-category-id" value="${data.alegraCategoryId || ''}">
+                                    </div>
+                                </div>
+                                <div id="internal-transfer-fields" class="hidden border-t pt-4">
+                                    <label class="block text-sm font-medium text-slate-700">Cuenta Destino/Origen (Espejo)</label>
+                                    <select id="mirror-bank-select" class="mt-1 block w-full rounded-md p-2" ${disabledAttr}>${generateBankOptionsHTML(null)}</select>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t">
+                                   <div class="lg:col-span-4"><label class="block text-sm font-medium text-slate-700">Cuenta Afectada</label><select id="bank-select" class="mt-1 block w-full rounded-md p-2" ${disabledAttr}>${generateBankOptionsHTML(data.bankAccountId)}</select></div>
+                                    <div><label>Fecha</label><input type="date" id="fecha" value="${formattedDate}" required class="mt-1 block w-full rounded-md p-2" ${disabledAttr}></div>
+                                    <div><label>Cantidad</label><input type="number" id="cantidad" value="${cantidad}" step="0.01" required class="mt-1 block w-full rounded-md p-2" ${disabledAttr}></div>
+                                    <div><label>Moneda</label><select id="moneda" class="mt-1 block w-full rounded-md p-2" ${disabledAttr}><option value="NIO" ${data.moneda === 'NIO' ? 'selected' : ''}>NIO</option><option value="USD" ${data.moneda === 'USD' ? 'selected' : ''}>USD</option></select></div>
+                                    <div><label>Tipo</label><select id="tipo" class="mt-1 block w-full rounded-md p-2" ${disabledAttr}><option value="out" ${data.tipo === 'out' ? 'selected' : ''}>Salida</option><option value="in" ${data.tipo === 'in' ? 'selected' : ''}>Entrada</option></select></div>
+                                    <div class="lg:col-span-4"><label>No. Confirmación</label><input type="text" value="${numeroConfirmacion}" id="numero_confirmacion" class="mt-1 block w-full rounded-md p-2" ${disabledAttr}></div>
+                                    <div class="lg:col-span-4"><label>Observaciones</label><textarea id="observaciones" rows="2" class="mt-1 block w-full rounded-md p-2" ${disabledAttr}>${observaciones}</textarea></div>
+                                </div>
+                                <div class="flex justify-end items-center gap-3 pt-4 border-t no-print ${buttonVisibility}">
+                                    <button type="submit" class="bg-emerald-600 text-white font-bold py-2 px-6 rounded-lg">Actualizar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function showToast(message, type = 'info') { 
+            const toast = document.createElement('div');
+            const colors = { info: 'bg-sky-500', success: 'bg-emerald-500', error: 'bg-red-500' };
+            toast.className = `fixed bottom-4 right-4 z-50 ${colors[type]} text-white font-bold py-3 px-5 rounded-lg shadow-xl`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function cleanAmount(amount) {
+            if (amount === null || amount === undefined) return null;
+            let amountStr = String(amount).replace(/[^\d,.]/g, '');
+            if (amountStr.lastIndexOf(',') > amountStr.lastIndexOf('.')) {
+                amountStr = amountStr.replace(/\./g, '').replace(',', '.');
+            } else { amountStr = amountStr.replace(/,/g, ''); }
+            const num = parseFloat(amountStr);
+            return isNaN(num) ? null : num;
+        }
+
+        function populateBankFilter() {
+            filterBank.innerHTML = '<option value="">Todos</option>';
+            const options = accountMappingsArray.slice().sort((a, b) => a.name.localeCompare(b.name))
+                .map(acc => `<option value="${acc.id}">${acc.name}</option>`).join('');
+            filterBank.insertAdjacentHTML('beforeend', DOMPurify.sanitize(options));
+        }
+
+        function generateBankOptionsHTML(selectedAccountId) {
+             return accountMappingsArray.sort((a, b) => a.name.localeCompare(b.name))
+                .map(account => `<option value="${account.id}" ${account.id == selectedAccountId ? 'selected' : ''}>${account.name}</option>`).join('');
+        }
+        
+        function formatDateHeader(dateString) {
+            const date = new Date(dateString + 'T00:00:00');
+            const today = new Date();
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            if (date.toDateString() === today.toDateString()) return `Hoy, ${date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}`;
+            if (date.toDateString() === yesterday.toDateString()) return `Ayer, ${date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}`;
+            return date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+        }
+        
+        [filterStartDate, filterEndDate, filterBank, filterStatus, generalSearchInput].forEach(el => {
+            if (el) el.addEventListener('input', applyFilters);
+        });
+    }
+
+    initHistoryApp();
+</script>
+</body>
+</html>
