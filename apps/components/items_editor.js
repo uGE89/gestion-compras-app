@@ -1,170 +1,306 @@
 // apps/components/items_editor.js
 export function ItemsEditor({
-  container,                 // HTMLElement donde se monta el editor
-  productCatalog = [],       // Catálogo global (con id, nombre, clave, PrecioU_Ref)
-  initialIVA = 15,           // IVA inicial
-  initialTC = 1,             // Tipo de cambio inicial
-  initialTotalAI = 0,        // Total de factura detectado por IA (opcional)
-  onChange = () => {}        // Callback cuando cambian ítems o parámetros
+  container,
+  productCatalog = [],
+  initialIVA = 15,
+  initialTC = 1,
+  initialTotalAI = 0,
+  onChange = () => {}
 }) {
-  // ------- Estado interno -------
-  let items = [];            // [{descripcion_factura, cantidad_factura, unidades_por_paquete, total_linea_base, ...}]
-  let iva = Number(initialIVA) || 0;
-  let tc  = Number(initialTC)  || 1;
+  // ===== Estado =====
+  let items = [];
+  let IVA = Number(initialIVA) || 0;
+  let TC  = Number(initialTC)  || 1;
   let totalAI = Number(initialTotalAI) || 0;
 
-  // ------- Utils -------
+  // ===== Utils =====
+  const $  = (sel, root=container) => root.querySelector(sel);
+  const $$ = (sel, root=container) => Array.from(root.querySelectorAll(sel));
+
   const parseLocalFloat = (v) => {
     if (typeof v === 'number') return v;
     if (typeof v !== 'string') return 0;
-    return parseFloat(v.replace(/,/g,'')) || 0;
+    return parseFloat(v.replace(/,/g, '')) || 0;
   };
-  const formatCurrency = (n) =>
-    `$${(n || 0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 
-  // ------- Estructura base -------
+  const cur = n => `$${(Number(n)||0).toLocaleString('en-US',{ minimumFractionDigits:2, maximumFractionDigits:2 })}`;
+
+  const norm = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+
+  const escapeHtml = (s='') =>
+    s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+
+  const highlight = (text, tokens) => {
+    if (!tokens.length) return text;
+    let out = text;
+    tokens.forEach(t=>{
+      if (!t) return;
+      const re = new RegExp(`(${t.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\$&')})`,'ig');
+      out = out.replace(re, '<mark>$1</mark>');
+    });
+    return out;
+  };
+
+  function searchCatalog(query, limit=50) {
+    const toks = norm(query).split(/\s+/).filter(Boolean);
+    if (!toks.length) return [];
+    const match = it => {
+      const hay = norm(`${it.nombre} ${it.clave} ${it.id}`);
+      return toks.every(t => hay.includes(t));
+    };
+    return productCatalog.filter(match).slice(0, limit);
+  }
+
+  // Preserva caret/foco entre repintados
+  function withCaretPreserved(root, mutateFn) {
+    const ae = document.activeElement;
+    const isText = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA');
+    const key = isText ? ae.getAttribute('data-key') : null;
+    const start = isText ? ae.selectionStart : null;
+    const end   = isText ? ae.selectionEnd   : null;
+
+    mutateFn();
+
+    if (key != null) {
+      const next = root.querySelector(`[data-key="${key}"]`);
+      if (next) {
+        next.focus();
+        try { next.setSelectionRange(start, end); } catch {}
+      }
+    }
+  }
+
+  // Debounce simple
+  function debounce(fn, ms=120) {
+    let t=null;
+    const f = (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), ms); };
+    f.cancel = ()=>clearTimeout(t);
+    return f;
+  }
+
+  // ===== Render raíz =====
   container.innerHTML = `
     <div class="bg-slate-50 p-6 rounded-lg">
       <h3 class="text-lg font-bold mb-4">Ajustes y Verificación de Artículos</h3>
+
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div>
           <label class="block text-sm font-medium text-slate-700">IVA (%)</label>
-          <input type="number" id="ie-iva" value="${iva}" step="0.01"
-                 class="ie-recalc mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2">
+          <input id="ie-iva" type="number" step="any" min="0" inputmode="decimal" value="${IVA}"
+            class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2">
         </div>
         <div>
           <label class="block text-sm font-medium text-slate-700">Tipo de Cambio</label>
-          <input type="number" id="ie-tc" value="${tc}" step="0.01"
-                 class="ie-recalc mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2">
+          <input id="ie-tc" type="number" step="any" min="0" inputmode="decimal" value="${TC}"
+            class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700">Total Factura (IA)</label>
+          <input id="ie-total-ai" type="number" step="0.01" value="${totalAI}"
+            class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2 bg-slate-100" readonly>
         </div>
       </div>
 
-      <div id="ie-items" class="mt-4 space-y-4"></div>
+      <div id="ie-items-list" class="mt-4 space-y-4"></div>
 
-      <div class="mt-4">
-        <button type="button" id="ie-add" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg flex items-center">
+      <div class="mt-4 flex items-center justify-between">
+        <button id="ie-add-item"
+          class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg flex items-center">
           <span class="material-icons mr-2">add</span>Añadir Artículo
         </button>
+        <div id="ie-summary" class="text-right text-sm text-slate-600"></div>
       </div>
-
-      <div id="ie-totals" class="mt-6 text-right border-t pt-4"></div>
     </div>
   `;
 
-  const elIVA    = container.querySelector('#ie-iva');
-  const elTC     = container.querySelector('#ie-tc');
-  const elList   = container.querySelector('#ie-items');
-  const elAdd    = container.querySelector('#ie-add');
-  const elTotals = container.querySelector('#ie-totals');
+  // ===== Listeners raíz =====
+  $('#ie-iva').addEventListener('input', () => { IVA = parseLocalFloat($('#ie-iva').value); renderSummary(); patchAllComputed(); onChange(getItems()); });
+  $('#ie-tc').addEventListener('input',  () => { TC  = parseLocalFloat($('#ie-tc').value);  renderSummary(); patchAllComputed(); onChange(getItems()); });
+  $('#ie-add-item').addEventListener('click', addItem);
 
-  // ------- Render principal -------
-  function renderList() {
-    elList.innerHTML = '';
-    items.forEach((_, idx) => {
-      const card = document.createElement('div');
-      card.className = 'ie-card bg-white p-4 rounded-lg shadow-sm border';
-      card.dataset.index = String(idx);
-      elList.appendChild(card);
-      updateCard(idx);
+  // Cerrar resultados al hacer click fuera
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.ie-search-wrap')) hideAllResults();
+  });
+  function hideAllResults() { $$('.ie-results').forEach(r => r.classList.add('hidden')); }
+
+  // ===== API expuesta =====
+  function addItems(newOnes=[]) { items.push(...newOnes); renderAll(); }
+  function setItems(next=[])   { items = [...next]; renderAll(); }
+  function getItems()          { return items.map(x=>({ ...x })); }
+  function setInvoiceTotal(n)  { totalAI = Number(n)||0; $('#ie-total-ai').value = totalAI.toFixed(2); renderSummary(); }
+
+  // ===== Render tarjetas =====
+  function renderAll() {
+    const list = $('#ie-items-list');
+    withCaretPreserved(container, () => {
+      list.innerHTML = '';
+      items.forEach((_, idx) => {
+        const card = document.createElement('div');
+        card.className = 'ie-card';
+        card.dataset.idx = idx;
+        list.appendChild(card);
+        renderCard(idx);
+      });
+      renderSummary();
     });
-    renderTotals();
-    onChange({ items: getItems(), iva, tc, grandTotal: getGrandTotal() });
+    onChange(getItems());
   }
 
-  // Cálculo por línea y totales
-  function computeLine(idx) {
+  function renderSummary() {
+    const ivaFactor = 1 + (IVA/100);
+    const totalCalc = items.reduce((sum, it)=>{
+      const base = Number(it.total_linea_base||0);
+      return sum + base * ivaFactor * (Number(TC)||1);
+    }, 0);
+    const diff = totalAI - totalCalc;
+    const diffCls = Math.abs(diff) < 1 ? 'text-emerald-600' : 'text-red-600';
+    $('#ie-summary').innerHTML = `
+      <div>Total Factura (IA): <b>${cur(totalAI)}</b></div>
+      <div>Total Calculado: <b class="text-slate-900">${cur(totalCalc)}</b></div>
+      <div class="${diffCls}">Diferencia: <b>${cur(diff)}</b></div>
+    `;
+  }
+
+  // Parchea solo los valores derivados (sin reconstruir inputs)
+  function patchComputedRow(idx) {
     const it = items[idx] || {};
-    const ivaFactor = 1 + (iva / 100);
-    const totalBase = Number(it.total_linea_base || 0);
-    const cant = Number(it.cantidad_factura || 0);
-    const uxp  = Number(it.unidades_por_paquete || 1);
-    const totalFinal = totalBase * ivaFactor * tc;
-    const unidadesTot = cant * uxp;
-    const precioUFinal = unidadesTot > 0 ? (totalFinal / unidadesTot) : 0;
-    return { totalFinal, precioUFinal };
-  }
-  function getGrandTotal() {
-    const ivaFactor = 1 + (iva / 100);
-    return items.reduce((s, it) => s + ((it.total_linea_base || 0) * ivaFactor * tc), 0);
-  }
-
-  // Render de una tarjeta
-  function updateCard(idx) {
-    const it = items[idx];
-    const card = elList.querySelector(`.ie-card[data-index="${idx}"]`);
+    const card = $(`.ie-card[data-idx="${idx}"]`);
     if (!card) return;
 
-    const { totalFinal, precioUFinal } = computeLine(idx);
-    const isAssociated = !!it.clave_catalogo;
+    const ivaFactor = 1 + (IVA/100);
+    const totalBase = Number(it.total_linea_base||0);
+    const cant = Number(it.cantidad_factura||0);
+    const uxp  = Number(it.unidades_por_paquete||1);
+    const totalFinal = totalBase * ivaFactor * (Number(TC)||1);
+    const unidades = cant * Math.max(uxp, 1);
+    const pUnit = unidades > 0 ? totalFinal / unidades : 0;
 
-    let priceComparisonHTML = '<div class="text-center text-slate-400 text-sm p-2">Asocia un artículo para comparar.</div>';
-    if (isAssociated) {
-      const cat = productCatalog.find(p => p.id === it.clave_catalogo);
-      if (cat) {
-        const ref = cat.PrecioU_Ref || 0;
-        const diffPct = ref > 0 ? ((precioUFinal - ref) / ref) * 100 : 0;
-        const diffClass = diffPct > 0.1 ? 'text-red-500' : (diffPct < -0.1 ? 'text-green-500' : 'text-slate-500');
-        const diffSign  = diffPct > 0.1 ? '+' : '';
-        priceComparisonHTML = `
-          <div class="flex justify-between items-center text-sm">
-            <span class="text-slate-500">Precio Ref.:</span>
-            <span class="font-bold text-slate-800">${formatCurrency(ref)}</span>
-          </div>
-          <div class="mt-2 pt-2 border-t border-slate-200 flex items-center justify-center ${diffClass}">
-            <div class="text-xl font-bold">${diffSign}${diffPct.toFixed(1)}%</div>
-          </div>
-        `;
+    const isAssoc = !!it.clave_catalogo;
+    const priceEl = card.querySelector('.final-unit-price');
+    if (priceEl) priceEl.textContent = cur(pUnit);
+
+    const cmp = card.querySelector('.price-comparison-content');
+    if (cmp) {
+      if (isAssoc) {
+        const cat = productCatalog.find(p => p.id === it.clave_catalogo);
+        if (cat) {
+          const ref = Number(cat.PrecioU_Ref||0);
+          const pct = ref>0 ? ((pUnit - ref) / ref) * 100 : 0;
+          const cls = pct>0.1 ? 'text-red-500' : (pct<-0.1 ? 'text-green-500':'text-slate-500');
+          const sign = pct>0 ? '+' : '';
+          cmp.innerHTML = `
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-500">Precio Ref.:</span>
+              <span class="font-bold text-slate-800">${cur(ref)}</span>
+            </div>
+            <div class="mt-2 pt-2 border-t border-slate-200 flex items-center justify-center ${cls}">
+              <div class="text-xl font-bold">${sign}${pct.toFixed(1)}%</div>
+            </div>`;
+        } else {
+          cmp.innerHTML = `<div class="text-center text-slate-400 text-sm p-2">Artículo no encontrado en catálogo.</div>`;
+        }
+      } else {
+        cmp.innerHTML = `<div class="text-center text-slate-400 text-sm p-2">Asocia un artículo para comparar.</div>`;
       }
     }
 
-    // Primer render
-    if (!card.dataset.rendered) {
-      const autoBadge = it.autoAssociated ? `<span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">Auto-asociado</span>` : '';
+    // Ajustar borde por asociación
+    card.classList.toggle('border-emerald-300', isAssoc);
+    card.classList.toggle('border-slate-200', !isAssoc);
+  }
+
+  function patchAllComputed() { items.forEach((_, i) => patchComputedRow(i)); }
+
+  function renderCard(idx) {
+    const it = items[idx] || {};
+    const card = $(`.ie-card[data-idx="${idx}"]`);
+    if (!card) return;
+
+    const ivaFactor = 1 + (IVA/100);
+    const totalBase = Number(it.total_linea_base||0);
+    const cant = Number(it.cantidad_factura||0);
+    const uxp  = Number(it.unidades_por_paquete||1);
+    const totalFinal = totalBase * ivaFactor * (Number(TC)||1);
+    const unidades = cant * Math.max(uxp, 1);
+    const pUnit = unidades > 0 ? totalFinal / unidades : 0;
+
+    const isAssoc = !!it.clave_catalogo;
+    let compareHTML = '<div class="text-center text-slate-400 text-sm p-2">Asocia un artículo para comparar.</div>';
+    if (isAssoc) {
+      const cat = productCatalog.find(p => p.id === it.clave_catalogo);
+      if (cat) {
+        const ref = Number(cat.PrecioU_Ref||0);
+        const pct = ref>0 ? ((pUnit - ref) / ref) * 100 : 0;
+        const cls = pct>0.1 ? 'text-red-500' : (pct<-0.1 ? 'text-green-500':'text-slate-500');
+        const sign = pct>0 ? '+' : '';
+        compareHTML = `
+          <div class="flex justify-between items-center text-sm">
+            <span class="text-slate-500">Precio Ref.:</span>
+            <span class="font-bold text-slate-800">${cur(ref)}</span>
+          </div>
+          <div class="mt-2 pt-2 border-t border-slate-200 flex items-center justify-center ${cls}">
+            <div class="text-xl font-bold">${sign}${pct.toFixed(1)}%</div>
+          </div>`;
+      }
+    }
+
+    const assocBadge = it.autoAssociated ? `<span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">Auto-asociado</span>` : '';
+
+    withCaretPreserved(card, () => {
+      card.className = `ie-card bg-white p-4 rounded-lg shadow-sm border ${isAssoc?'border-emerald-300':'border-slate-200'}`;
       card.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <label class="block text-sm font-medium text-slate-700">Descripción en Factura</label>
-              ${autoBadge}
+              ${assocBadge}
             </div>
             <div>
-              <textarea data-field="descripcion_factura"
-                        class="ie-input w-full p-2 border rounded text-slate-800"
-                        rows="2">${it.descripcion_factura || ''}</textarea>
+              <textarea data-field="descripcion_factura" data-key="desc-${idx}"
+                class="ie-input w-full p-2 border rounded text-slate-800" rows="2">${it.descripcion_factura||''}</textarea>
             </div>
 
-            <div class="search-container relative">
+            <div class="ie-search-wrap relative">
               <label class="block text-sm font-medium text-slate-700">Asociar con Catálogo (Buscar)</label>
-              <input type="text" class="ie-search w-full p-2 border rounded bg-white shadow-sm" placeholder="Escribe para buscar...">
-              <div class="ie-results hidden absolute z-10 w-full bg-white border mt-1 rounded-md shadow-lg max-h-60 overflow-y-auto"></div>
+              <input type="text" class="ie-search w-full p-2 border rounded bg-white shadow-sm"
+                placeholder="Escribe para buscar…" autocomplete="off"
+                aria-expanded="false" aria-autocomplete="list" role="combobox">
+              <div class="ie-results hidden absolute z-10 w-full bg-white border mt-1 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                role="listbox"></div>
               <div class="ie-selected text-sm mt-1"></div>
             </div>
           </div>
 
           <div class="space-y-3">
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-slate-700">Cantidad</label>
-                <input type="number" value="${it.cantidad_factura || 0}"
-                       data-field="cantidad_factura" class="ie-input w-full p-2 border rounded text-slate-800">
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-slate-700">Total Base</label>
-                <input type="text" value="${(it.total_linea_base || 0).toLocaleString('en-US')}"
-                       data-field="total_linea_base" class="ie-input w-full p-2 border rounded text-right text-slate-800">
-              </div>
-            </div>
+<div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+  <div>
+    <label class="block text-sm font-medium text-slate-700">Cantidad</label>
+    <input type="number" step="any" min="0" inputmode="decimal" data-field="cantidad_factura" data-key="cant-${idx}" value="${cant||0}" class="ie-input w-full p-2 border rounded text-slate-800">
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-slate-700">UxP</label>
+    <input type="number" step="any" min="1" inputmode="decimal" data-field="unidades_por_paquete" data-key="uxp-${idx}" value="${uxp||1}" class="ie-input w-full p-2 border rounded text-slate-800">
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-slate-700">Total Base</label>
+    <input type="text" data-field="total_linea_base" value="${(totalBase||0).toLocaleString('en-US')}" class="ie-input w-full p-2 border rounded text-right text-slate-800">
+  </div>
+</div>
+
 
             <div>
               <label class="block text-sm font-medium text-slate-700">Clave Proveedor</label>
-              <input type="text" value="${it.clave_proveedor || ''}"
-                     data-field="clave_proveedor" class="ie-input w-full p-2 border rounded text-slate-800">
+              <input type="text" data-field="clave_proveedor" data-key="prov-${idx}"
+                value="${it.clave_proveedor||''}" class="ie-input w-full p-2 border rounded text-slate-800">
             </div>
 
             <div class="p-3 rounded-md bg-slate-50 border">
-              <h4 class="text-sm font-bold text-center text-slate-600 mb-2">Análisis de Precio Unitario (Final)</h4>
-              <div class="text-center text-2xl font-bold text-emerald-600 ie-unit">${formatCurrency(precioUFinal)}</div>
-              <div class="mt-2 pt-2 border-t ie-compare">${priceComparisonHTML}</div>
+              <h4 class="text-sm font-bold text-center text-slate-600 mb-2">Precio Unitario Final</h4>
+              <div class="text-center text-2xl font-bold text-emerald-600 final-unit-price">${cur(pUnit)}</div>
+              <div class="mt-2 pt-2 border-t price-comparison-content">${compareHTML}</div>
             </div>
 
             <div class="text-right">
@@ -173,28 +309,170 @@ export function ItemsEditor({
           </div>
         </div>
       `;
-      card.dataset.rendered = '1';
-      updateSelectedDisplay(idx);
-    } else {
-      card.querySelector('.ie-unit').textContent = formatCurrency(precioUFinal);
-      card.querySelector('.ie-compare').innerHTML = priceComparisonHTML;
-      updateSelectedDisplay(idx);
+    });
+
+    updateSelected(idx);
+
+    // Inputs → actualizar modelo + parchar derivados (sin reconstruir todo)
+    card.querySelectorAll('.ie-input').forEach(inp=>{
+      inp.addEventListener('input', () => {
+        const field = inp.dataset.field;
+        let val = inp.value;
+        if (['cantidad_factura','unidades_por_paquete','total_linea_base'].includes(field)) {
+          val = parseLocalFloat(val);
+        }
+        items[idx][field] = val;
+        patchComputedRow(idx);
+        renderSummary();
+        onChange(getItems());
+      });
+    });
+
+    // Buscar con teclado
+    const searchInput   = card.querySelector('.ie-search');
+    const resultsBox    = card.querySelector('.ie-results');
+    let activeIndex = -1;
+
+    const openResults = () => { resultsBox.classList.remove('hidden'); searchInput.setAttribute('aria-expanded','true'); };
+    const closeResults = () => { resultsBox.classList.add('hidden'); searchInput.setAttribute('aria-expanded','false'); activeIndex = -1; setActiveItem(); };
+
+    const debounced = debounce((q)=>{
+      const hits = searchCatalog(q);
+      resultsBox.innerHTML = hits.map((p,i)=>`
+        <div class="ie-item px-2 py-1 cursor-pointer hover:bg-emerald-100"
+             role="option" id="opt-${idx}-${i}" data-id="${p.id}">
+          <div class="text-sm">${highlight(escapeHtml(p.nombre), norm(q).split(/\s+/).filter(Boolean))}</div>
+          <div class="text-xs text-slate-500">${p.clave}</div>
+        </div>
+      `).join('') || `<div class="px-2 py-2 text-sm text-slate-400">Sin resultados</div>`;
+      activeIndex = hits.length ? 0 : -1;
+      setActiveItem();
+      openResults();
+    }, 120);
+
+    searchInput.addEventListener('input', (e)=>{
+      const q = e.target.value.trim();
+      if (!q) { closeResults(); return; }
+      debounced(q);
+    });
+
+    searchInput.addEventListener('keydown', (e)=>{
+      if (resultsBox.classList.contains('hidden')) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          const q = e.currentTarget.value.trim();
+          if (!q) return;
+          debounced.cancel?.();
+          const hits = searchCatalog(q);
+          resultsBox.innerHTML = hits.map((p,i)=>`
+            <div class="ie-item px-2 py-1 cursor-pointer hover:bg-emerald-100"
+                role="option" id="opt-${idx}-${i}" data-id="${p.id}">
+              <div class="text-sm">${highlight(escapeHtml(p.nombre), norm(q).split(/\s+/).filter(Boolean))}</div>
+              <div class="text-xs text-slate-500">${p.clave}</div>
+            </div>
+          `).join('') || `<div class="px-2 py-2 text-sm text-slate-400">Sin resultados</div>`;
+          activeIndex = hits.length ? 0 : -1;
+          setActiveItem();
+          openResults();
+          return;
+        }
+      }
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const opts = resultsBox.querySelectorAll('.ie-item');
+        if (!opts.length) return;
+        activeIndex = (activeIndex + 1 + opts.length) % opts.length;
+        setActiveItem(true);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const opts = resultsBox.querySelectorAll('.ie-item');
+        if (!opts.length) return;
+        activeIndex = (activeIndex - 1 + opts.length) % opts.length;
+        setActiveItem(true);
+      } else if (e.key === 'Enter') {
+        if (!resultsBox.classList.contains('hidden')) {
+          e.preventDefault();
+          const opt = resultsBox.querySelectorAll('.ie-item')[activeIndex];
+          if (opt) choose(opt.dataset.id);
+        }
+      } else if (e.key === 'Escape') {
+        closeResults();
+      }
+    });
+
+    resultsBox.addEventListener('mousemove', (e)=>{
+      const opt = e.target.closest('.ie-item');
+      if (!opt) return;
+      const opts = Array.from(resultsBox.querySelectorAll('.ie-item'));
+      const i = opts.indexOf(opt);
+      if (i >= 0) { activeIndex = i; setActiveItem(); }
+    });
+    resultsBox.addEventListener('click', (e)=>{
+      const opt = e.target.closest('.ie-item'); if (!opt) return;
+      choose(opt.dataset.id);
+    });
+
+    function setActiveItem(scrollIntoView=false) {
+      const opts = resultsBox.querySelectorAll('.ie-item');
+      opts.forEach((el,i)=>{
+        if (i === activeIndex) {
+          el.classList.add('bg-emerald-100');
+          el.setAttribute('aria-selected','true');
+          searchInput.setAttribute('aria-activedescendant', el.id);
+          if (scrollIntoView) el.scrollIntoView({block:'nearest'});
+        } else {
+          el.classList.remove('bg-emerald-100');
+          el.removeAttribute('aria-selected');
+        }
+      });
     }
 
-    // Borde según asociación
-    card.classList.remove('border-slate-200','border-emerald-300');
-    card.classList.add(isAssociated ? 'border-emerald-300' : 'border-slate-200');
+    function choose(id) {
+      const art = productCatalog.find(p => p.id === id);
+      if (!art) return;
+      items[idx].clave_catalogo = art.id;
+      items[idx].desc_catalogo  = art.nombre;
+      items[idx].autoAssociated = false;
+      searchInput.value = '';
+      closeResults();
+      patchComputedRow(idx);
+      updateSelected(idx);
+      renderSummary();
+      onChange(getItems());
+    }
+
+    // Limpiar asociación
+    card.querySelector('.ie-selected').addEventListener('click', (e)=>{
+      const btn = e.target.closest('.ie-clear');
+      if (!btn) return;
+      items[idx].clave_catalogo = null;
+      items[idx].desc_catalogo  = null;
+      patchComputedRow(idx);
+      updateSelected(idx);
+      renderSummary();
+      onChange(getItems());
+    });
+
+    // Eliminar ítem
+    card.querySelector('.ie-del').addEventListener('click', ()=>{
+      items.splice(idx,1);
+      renderAll();
+    });
   }
 
-  function updateSelectedDisplay(idx) {
-    const card = elList.querySelector(`.ie-card[data-index="${idx}"]`);
-    if (!card) return;
+  function updateSelected(idx) {
+    const it = items[idx] || {};
+    const card = $(`.ie-card[data-idx="${idx}"]`);
     const display = card.querySelector('.ie-selected');
     const input   = card.querySelector('.ie-search');
-    const it = items[idx];
     if (it.clave_catalogo && it.desc_catalogo) {
-      display.innerHTML = `Asociado: <strong class="text-emerald-700">${it.desc_catalogo}</strong>
-        <button class="ie-clear text-red-500 hover:text-red-700 font-bold ml-2" title="Desasociar">X</button>`;
+      display.innerHTML = `
+        Asociado:
+        <strong class="text-emerald-700">${escapeHtml(it.desc_catalogo)}</strong>
+        <span class="text-xs text-slate-500 ml-2">(Clave: ${escapeHtml(it.clave_catalogo)})</span>
+        <button type="button" class="ie-clear text-red-500 hover:text-red-700 font-bold ml-2" title="Desasociar">X</button>
+      `;
       input.style.display = 'none';
     } else {
       display.innerHTML = '';
@@ -202,100 +480,7 @@ export function ItemsEditor({
     }
   }
 
-  function renderTotals() {
-    const grand = getGrandTotal();
-    const diff  = totalAI - grand;
-    const cls   = Math.abs(diff) < 1 ? 'text-green-600' : 'text-red-600';
-    elTotals.innerHTML = `
-      <p class="text-sm">Total Factura (IA): <span class="font-bold text-slate-600">${formatCurrency(totalAI)}</span></p>
-      <p class="text-lg">Total Calculado: <span class="font-bold text-slate-900">${formatCurrency(grand)}</span></p>
-      <p class="text-sm ${cls}">Diferencia: <span class="font-bold">${formatCurrency(diff)}</span></p>
-    `;
-  }
-
-  // ------- Eventos del editor -------
-  container.addEventListener('input', (e) => {
-    const card = e.target.closest('.ie-card');
-    if (card && e.target.classList.contains('ie-input')) {
-      const idx = Number(card.dataset.index);
-      const field = e.target.dataset.field;
-      const raw = e.target.value;
-      const val = (field === 'cantidad_factura' || field === 'unidades_por_paquete' || field === 'total_linea_base')
-        ? parseLocalFloat(raw) : raw;
-      items[idx][field] = val;
-      updateCard(idx);
-      renderTotals();
-      onChange({ items: getItems(), iva, tc, grandTotal: getGrandTotal() });
-    }
-  });
-
-  container.addEventListener('click', (e) => {
-    // Borrar
-    if (e.target.classList.contains('ie-del')) {
-      const card = e.target.closest('.ie-card');
-      const idx = Number(card.dataset.index);
-      items.splice(idx, 1);
-      renderList();
-      return;
-    }
-    // Desasociar
-    if (e.target.classList.contains('ie-clear')) {
-      const card = e.target.closest('.ie-card');
-      const idx = Number(card.dataset.index);
-      items[idx].clave_catalogo = null;
-      items[idx].desc_catalogo  = null;
-      updateCard(idx);
-      renderTotals();
-      onChange({ items: getItems(), iva, tc, grandTotal: getGrandTotal() });
-      return;
-    }
-  });
-
-  // Buscar en catálogo (al teclear)
-  container.addEventListener('input', (e) => {
-    if (!e.target.classList.contains('ie-search')) return;
-    const card = e.target.closest('.ie-card');
-    const idx = Number(card.dataset.index);
-    const results = card.querySelector('.ie-results');
-    const tokens = (e.target.value || '').toLowerCase().split(' ').filter(Boolean);
-    results.innerHTML = '';
-    if (!tokens.length) { results.classList.add('hidden'); return; }
-    const list = productCatalog.filter(p => {
-      const txt = `${p.nombre} ${p.clave}`.toLowerCase();
-      return tokens.every(t => txt.includes(t));
-    }).slice(0, 50);
-    if (!list.length) { results.classList.add('hidden'); return; }
-    list.forEach(p => {
-      const div = document.createElement('div');
-      div.className = 'p-2 hover:bg-emerald-100 cursor-pointer';
-      div.textContent = `${p.nombre} (Clave: ${p.clave})`;
-      div.dataset.clave = p.id;
-      div.classList.add('ie-hit');
-      results.appendChild(div);
-    });
-    results.classList.remove('hidden');
-  });
-
-  // Seleccionar un resultado de búsqueda
-  container.addEventListener('click', (e) => {
-    if (!e.target.classList.contains('ie-hit')) return;
-    const card = e.target.closest('.ie-card');
-    const idx  = Number(card.dataset.index);
-    const clave = e.target.dataset.clave;
-    const art = productCatalog.find(p => p.id === clave);
-    if (art) {
-      items[idx].clave_catalogo = clave;
-      items[idx].desc_catalogo  = art.nombre;
-    }
-    card.querySelector('.ie-results').classList.add('hidden');
-    card.querySelector('.ie-search').value = '';
-    updateCard(idx);
-    renderTotals();
-    onChange({ items: getItems(), iva, tc, grandTotal: getGrandTotal() });
-  });
-
-  // Botón añadir ítem vacío
-  elAdd.addEventListener('click', () => {
+  function addItem() {
     items.push({
       descripcion_factura: '',
       cantidad_factura: 1,
@@ -306,63 +491,14 @@ export function ItemsEditor({
       desc_catalogo: null,
       recibido: false
     });
-    renderList();
-  });
-
-  // IVA / TC
-  container.addEventListener('input', (e) => {
-    if (!e.target.classList.contains('ie-recalc')) return;
-    iva = Number(elIVA.value) || 0;
-    tc  = Number(elTC.value)  || 1;
-    // Solo re-render totales y tarjetas (precios unitarios)
-    elList.querySelectorAll('.ie-card').forEach(card => {
-      updateCard(Number(card.dataset.index));
-    });
-    renderTotals();
-    onChange({ items: getItems(), iva, tc, grandTotal: getGrandTotal() });
-  });
-
-  // ------- API pública -------
-  function setItems(arr = []) {
-    items = arr.map(x => ({ ...x }));
-    renderList();
-  }
-  // Anexar SIEMPRE (tu requerimiento). Si quisieras dedupe, podrías agregarlo aquí.
-  function addItems(arr = []) {
-    items.push(...arr.map(x => ({ ...x })));
-    renderList();
-  }
-  function getItems() {
-    return items.map(x => ({ ...x }));
-  }
-  function setInvoiceTotal(n) {
-    totalAI = Number(n) || 0;
-    renderTotals();
-  }
-  function setParams({ iva: nIva, tipoCambio }) {
-    if (typeof nIva === 'number') { iva = nIva; elIVA.value = String(nIva); }
-    if (typeof tipoCambio === 'number') { tc = tipoCambio; elTC.value = String(tipoCambio); }
-    // Recalcular
-    elList.querySelectorAll('.ie-card').forEach(card => updateCard(Number(card.dataset.index)));
-    renderTotals();
-  }
-  function getGrandTotalPublic() {
-    return getGrandTotal();
-  }
-  function destroy() {
-    container.innerHTML = '';
+    renderAll();
   }
 
-  // Render inicial
-  renderList();
+  // Primera render
+  renderAll();
 
+  // API pública
   return {
-    setItems,
-    addItems,
-    getItems,
-    setInvoiceTotal,
-    setParams,
-    getGrandTotal: getGrandTotalPublic,
-    destroy
+    addItems, setItems, getItems, setInvoiceTotal
   };
 }
