@@ -7,6 +7,14 @@ import { ref, uploadBytes, getDownloadURL }
   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 import { ItemsEditor } from './components/items_editor.js';
 
+const MAP_COLLECTION = 'mapeo_articulos';
+const slugifyDesc = (s='') =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+   .toLowerCase()
+   .replace(/[^a-z0-9]+/g,'-')
+   .replace(/^-+|-+$/g,'');
+
+
 export default {
   title: 'Editar Compra',
   async mount(container, { db, storage, auth, appState, env, params }) {
@@ -106,7 +114,7 @@ export default {
     async function findAssociation(description) {
       if (!description) return null;
       const mapId = description.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-');
-      const mref = doc(db, 'mapeo_articulos', mapId);
+      const mref = doc(db, MAP_COLLECTION, mapId);
       const snap = await (await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js")).getDoc(mref);
       return snap.exists() ? snap.data() : null;
     }
@@ -378,7 +386,7 @@ export default {
         for (const it of itemsForMap) {
           if (it.clave_catalogo && it.descripcion_factura) {
             const mapId = it.descripcion_factura.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-');
-            await setDoc(doc(db, 'mapeo_articulos', mapId), {
+            await setDoc(doc(db,  MAP_COLLECTION, mapId), {
               descripcion_proveedor: it.descripcion_factura,
               clave_catalogo: it.clave_catalogo,
               desc_catalogo: it.desc_catalogo,
