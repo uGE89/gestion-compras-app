@@ -75,7 +75,7 @@ export default {
     toolbar.appendChild(status);
 
     [sucSel, start, end, status].forEach(el => el.addEventListener('change', render));
-    newBtn.addEventListener('click', () => navigate('compras_registrar'));
+    newBtn.addEventListener('click', () => location.hash = '#/compras_registrar');
 
     // ------- Datos (snapshot) -------
     const purchasesCol = collection(db, 'compras');
