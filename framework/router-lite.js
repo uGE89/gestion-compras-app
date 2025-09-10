@@ -33,10 +33,10 @@ export function createRouter({ container, registry, deps, fallbackLoadContent })
     // 2) Fallback: si piden un .html, delega al app_loader
     if (!loader) {
       const looksHtml = cleanPath.endsWith('.html');
-      if (fallbackLoadContent && looksHtml) {
+      if (fallbackLoadContent) {
         container.innerHTML = '';
         // reconstruye ruta original del .html (sin hash)
-        const filename = cleanPath;               // p.ej. "compras.html"
+        const filename = looksHtml ? cleanPath : 'fallback.html';
         return fallbackLoadContent(filename);
       }
 
@@ -56,7 +56,7 @@ export function createRouter({ container, registry, deps, fallbackLoadContent })
       console.error('[router-lite] error montando app', err);
       if (fallbackLoadContent) {
         container.innerHTML = '';
-        await fallbackLoadContent('compras.html');
+        await fallbackLoadContent('fallback.html');
       } else {
         container.innerHTML = '<div class="text-center text-red-500 py-10">Error cargando app.</div>';
       }

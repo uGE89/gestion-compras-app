@@ -9,7 +9,7 @@ const URLS_TO_CACHE = [
   '/',
   '/index.html',
   '/login.html',
-  '/compras.html',
+  '/fallback.html',
   '/app_extraccion.html',
   '/app_pedidos_movil.html',
   '/app_historial_transferencias.html',
