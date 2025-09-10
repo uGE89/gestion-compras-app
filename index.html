@@ -134,7 +134,7 @@
   registry,
   deps: { appState, auth, db: firestoreDb, storage: firebaseStorage, env },  
   fallbackLoadContent: async (routeOrFile) => {
-    const file = routeOrFile.endsWith('.html') ? routeOrFile : 'compras.html';
+    const file = routeOrFile.endsWith('.html') ? routeOrFile : 'fallback.html';
     await loadContent(file, contentContainer);
   }
 });
