@@ -120,6 +120,12 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
       return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
     };
 
+    const normalizeText = (str) =>
+      String(str ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+
     // ===== Estado UI y del Pedido Actual =====
     let currentOrder = new Map(); // id -> { product, quantity }
     let lastFilteredProducts = [];
@@ -288,8 +294,11 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
       }
 
       if (searchTerm) {
-        const nq = searchTerm.toLowerCase();
-        filtered = filtered.filter((p) => `${p.nombre} ${p.clave}`.toLowerCase().includes(nq));
+        const tokens = normalizeText(searchTerm).split(/\s+/).filter(Boolean);
+        filtered = filtered.filter((p) => {
+          const haystack = normalizeText(`${p.nombre} ${p.clave}`);
+          return tokens.every((t) => haystack.includes(t));
+        });
       }
 
       filtered.sort((a, b) => ((b.kpis?.PrioridadScore) || 0) - ((a.kpis?.PrioridadScore) || 0));
