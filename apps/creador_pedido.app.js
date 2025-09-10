@@ -139,10 +139,9 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
       try {
         const draft = JSON.parse(savedDraft);
         for (const id in draft) {
-          const idStr = String(id);
-          const product = productCatalog.find((p) => String(p.id) === idStr);
+          const product = productCatalog.find((p) => p.id === id);
           if (product) {
-            currentOrder.set(idStr, { product, quantity: draft[id] });
+            currentOrder.set(id, { product, quantity: draft[id] });
           }
         }
       } catch (e) {
@@ -154,7 +153,7 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
     const saveDraftOrder = () => {
       const draftToSave = {};
       currentOrder.forEach((item, id) => {
-        draftToSave[String(id)] = item.quantity;
+        draftToSave[id] = item.quantity;
       });
       localStorage.setItem('draftOrder', JSON.stringify(draftToSave));
     };
@@ -238,14 +237,13 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
     }
 
     const updateOrder = (productId, quantity) => {
-      const idStr = String(productId);
       if (quantity > 0) {
-        const product = productCatalog.find((p) => String(p.id) === idStr);
+        const product = productCatalog.find((p) => p.id === productId);
         if (product) {
-          currentOrder.set(idStr, { product, quantity });
+          currentOrder.set(productId, { product, quantity });
         }
       } else {
-        currentOrder.delete(idStr);
+        currentOrder.delete(productId);
       }
       updateOrderCount();
       saveDraftOrder();
@@ -304,7 +302,7 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
     };
 
     const createProductRowHTML = (p) => {
-      const orderedItem = currentOrder.get(String(p.id));
+      const orderedItem = currentOrder.get(p.id);
       const isOrdered = !!orderedItem;
       const cantidadSugerida = p.kpis?.cantidadSugerida || 0;
 
@@ -446,7 +444,7 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
         lastFilteredProducts.forEach((p) => {
           const sugerida = p.kpis?.cantidadSugerida || 0;
           if (sugerida > 0) {
-            const currentQty = Number(currentOrder.get(String(p.id))?.quantity) || 0;
+            const currentQty = Number(currentOrder.get(p.id)?.quantity) || 0;
             if (!(currentQty > 0)) {
               updateOrder(p.id, sugerida);
             }
@@ -478,8 +476,9 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
       // Ir a la vista "Mis pedidos"
       container.querySelector('#nav-my-orders-btn')?.addEventListener('click', (e) => {
         e.preventDefault();
-        // Carga la micro-app registrada 'mis_pedidos'
+        // Usa la vista legacy registrada en index.html
         location.hash = '#/mis_pedidos';
+        // Si más adelante creas una app modular: location.hash = '#/mis-pedidos';
       });
 
       // Guardar pedido (Firestore con esquema del ejemplo)
