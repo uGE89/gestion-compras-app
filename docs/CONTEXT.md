@@ -26,8 +26,14 @@
   - `createDraftStore` (`framework/drafts.js`) guarda borradores en `localStorage`.
 
 ## Service Worker
-- `service-worker.js` implementa app‑shell con `CACHE_NAME`.
-- Para forzar actualización: cambiar `CACHE_NAME` o recargar con hard reload.
+- `service-worker.js` implementa el app‑shell y gestiona la caché.
+- `APP_VERSION` se concatena a un prefijo para generar `CACHE_NAME`; cambiarla en cada despliegue
+  invalida cachés antiguos.
+- Estrategias:
+  - **network-first** para HTML, JS y CSS → asegura recursos frescos con respaldo al caché.
+  - **cache-first** para imágenes y fuentes → mejora rendimiento pero puede servir contenido viejo.
+- La app puede enviar `postMessage({ type: 'SKIP_WAITING' })` al Service Worker para que la versión
+  actualizada se active inmediatamente.
 
 ## Flujo de datos e IA
 1. Usuario inicia sesión.
