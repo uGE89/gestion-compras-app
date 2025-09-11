@@ -29,18 +29,45 @@ export function toISODate(any) {
   if (!any) return null;
   if (any instanceof Date) return any.toISOString().slice(0,10);
   const s = String(any).trim();
-  // Intenta formatos comunes (incluye 03/SEP/2025 del banco)
+
+  // === 1) dd/MMM/yyyy (ES o EN), acepta primeras o últimas 3 letras del mes
   const monthMap = {
-    'ENE':'01','FEB':'02','MAR':'03','ABR':'04','MAY':'05','JUN':'06',
-    'JUL':'07','AGO':'08','SEP':'09','SET':'09','OCT':'10','NOV':'11','DIC':'12'
+    // Español
+    ENE:'01', FEB:'02', MAR:'03', ABR:'04', MAY:'05', JUN:'06',
+    JUL:'07', AGO:'08', SEP:'09', SET:'09', OCT:'10', NOV:'11', DIC:'12',
+    // Inglés
+    JAN:'01', APR:'04', AUG:'08', DEC:'12'
   };
-  const m1 = s.match(/^(\d{2})\/(\w{3})\/(\d{4})$/i);
-  if (m1) {
-    const dd = m1[1], mmm = m1[2].toUpperCase(), yyyy = m1[3];
-    const mm = monthMap[mmm] || null;
-    if (mm) return `${yyyy}-${mm}-${dd}`;
+  // Completar alias faltantes en inglés que coinciden con ES (FEB, MAR, MAY, JUN, JUL, SEP, OCT, NOV)
+  Object.assign(monthMap, { FEB:'02', MAR:'03', MAY:'05', JUN:'06', JUL:'07', SEP:'09', OCT:'10', NOV:'11' });
+
+  const mAlpha = s.match(/^(\d{1,2})[\/\-. ]([A-Za-z]{3,})[\/\-. ](\d{4})$/);
+  if (mAlpha) {
+    const dd = mAlpha[1].padStart(2, '0');
+    const raw = mAlpha[2].toUpperCase();
+    const y  = mAlpha[3];
+    const keyA = raw.slice(0,3);      // primeras 3
+    const keyB = raw.slice(-3);       // últimas 3 (por si ponen SEPT, MARCH, etc.)
+    const mm = monthMap[keyA] || monthMap[keyB];
+    if (mm) return `${y}-${mm}-${dd}`;
   }
-  // fallback Date
+
+  // === 2) Formato numérico d/m/yyyy (Alegra: ej. "4/9/2025"), admite -, . como separador
+  const mNum = s.match(/^(\d{1,2})[\/\-. ](\d{1,2})[\/\-. ](\d{2,4})$/);
+  if (mNum) {
+    let d = parseInt(mNum[1], 10);
+    let m = parseInt(mNum[2], 10);
+    let y = parseInt(mNum[3], 10);
+    if (y < 100) y += 2000;
+    // Interpretación preferida: dd/mm/yyyy (Alegra usa día/mes/año)
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      const dd = String(d).padStart(2, '0');
+      const mm = String(m).padStart(2, '0');
+      return `${y}-${mm}-${dd}`;
+    }
+  }
+
+  // === 3) Fallback: confiar al Date parser
   const d = new Date(s);
   if (!Number.isFinite(d.getTime())) return null;
   return d.toISOString().slice(0,10);
