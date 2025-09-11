@@ -1,18 +1,12 @@
 // apps/compras_registrar.app.js
 import {
-  collection, addDoc, query, where, getDocs, doc, setDoc, getDoc,
-  serverTimestamp, increment
+  collection, addDoc, query, where, getDocs,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL }
   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 import { ItemsEditor } from './components/items_editor.js';
-
-const MAP_COLLECTION = 'mapeo_articulos';
-const slugifyDesc = (s='') =>
-  s.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-   .toLowerCase()
-   .replace(/[^a-z0-9]+/g,'-')
-   .replace(/^-+|-+$/g,'');
+import { associateItemsBatch, persistMappingsForItems } from '../lib/associations.js';
 
 
 
@@ -102,15 +96,6 @@ export default {
       const storageRef = ref(storage, path);
       const snap = await uploadBytes(storageRef, fileOrBlob);
       return getDownloadURL(snap.ref);
-    }
-
-    // ===== Mapeo descripción → catálogo =====
-    async function findAssociation(description) {
-      if (!description) return null;
-      const mapId = description.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-');
-      const mref = doc(db,  MAP_COLLECTION, mapId);
-      const snap = await getDoc(mref);
-      return snap.exists() ? snap.data() : null;
     }
 
     // ===== UI =====
@@ -257,21 +242,16 @@ export default {
           // Editor: actualizar total IA y ANEXAR ítems
           itemsEditor.setInvoiceTotal(totalFacturaAI);
 
-          const associationPromises = (extracted.items || []).map(async (it) => {
-            const assoc = await findAssociation(it.descripcion);
-            return {
-              descripcion_factura: it.descripcion,
-              cantidad_factura: parseLocalFloat(it.cantidad),
-              unidades_por_paquete: 1,
-              total_linea_base: parseLocalFloat(it.total_linea),
-              clave_proveedor: it.clave_proveedor || null,
-              clave_catalogo: assoc ? assoc.clave_catalogo : null,
-              desc_catalogo: assoc ? assoc.desc_catalogo : null,
-              autoAssociated: !!assoc,
-              recibido: false
-            };
-          });
-          const newItems = await Promise.all(associationPromises);
+          const baseItems = (extracted.items || []).map(it => ({
+            descripcion_factura: it.descripcion,
+            cantidad_factura: parseLocalFloat(it.cantidad),
+            unidades_por_paquete: 1,
+            total_linea_base: parseLocalFloat(it.total_linea),
+            clave_proveedor: it.clave_proveedor || null,
+            recibido: false
+          }));
+          const withAssoc = await associateItemsBatch(db, $('#proveedor', root).value || extracted.proveedor || '', baseItems);
+          const newItems = withAssoc.map(it => ({ ...it, autoAssociated: !!it.clave_catalogo }));
           itemsEditor.addItems(newItems); // <--- ANEXAR SIEMPRE
           showToast('Datos y productos extraídos por la IA.', 'success');
         } else {
@@ -369,19 +349,7 @@ export default {
         const col = collection(db, 'compras');
         await addDoc(col, purchaseData);
 
-        // Persistir asociaciones (mapeo)
-        for (const it of rawItems) {
-          if (it.clave_catalogo && it.descripcion_factura) {
-            const mapId = it.descripcion_factura.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-');
-            await setDoc(doc(db,  MAP_COLLECTION, mapId), {
-              descripcion_proveedor: it.descripcion_factura,
-              clave_catalogo: it.clave_catalogo,
-              desc_catalogo: it.desc_catalogo,
-              ultima_actualizacion: serverTimestamp(),
-              conteo_usos: increment(1)
-            }, { merge: true });
-          }
-        }
+        await persistMappingsForItems(db, proveedor, rawItems);
 
         showToast('Compra registrada con éxito.', 'success');
         location.hash = '#/compras_historial';
