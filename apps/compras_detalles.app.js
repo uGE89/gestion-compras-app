@@ -62,6 +62,7 @@ export default {
             </p>
           </div>
           <div class="flex gap-2">
+            <button id="back" class="text-slate-600 hover:text-slate-900">Volver</button>
             <button id="edit-btn" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg">Editar</button>
             <button id="toggle-sicar-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
               ${data.agregado_sicar ? 'Quitar de Sicar' : 'Marcar Agregado en Sicar'}
@@ -209,6 +210,11 @@ export default {
       // Ir a editar (sin navigate; compatible con tu router actual)
       root.querySelector('#edit-btn').addEventListener('click', ()=>{
         location.hash = `#/compras_editar?id=${encodeURIComponent(id)}`;
+      });
+
+      // Volver al historial de compras
+      root.querySelector('#back').addEventListener('click', ()=>{
+        location.hash = '#/compras_historial';
       });
 
       // Toggle Sicar

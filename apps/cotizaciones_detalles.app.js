@@ -50,6 +50,7 @@ export default {
             <p class="text-slate-500">#${folio} · ${data.proveedor || '—'}</p>
           </div>
           <div class="flex gap-2">
+            <button id="back" class="text-slate-600 hover:text-slate-900">Volver</button>
             <button id="edit-btn" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg">Editar</button>
           </div>
         </header>
@@ -165,6 +166,11 @@ export default {
           </div>
         </section>
       `;
+
+      // Volver al historial de cotizaciones
+      root.querySelector('#back').addEventListener('click', ()=>{
+        location.hash = '#/cotizaciones_historial';
+      });
 
       // Navegar a editar
       root.querySelector('#edit-btn').addEventListener('click', ()=>{
