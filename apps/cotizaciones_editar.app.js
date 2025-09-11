@@ -3,7 +3,7 @@ import {
   doc, getDoc, updateDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { ItemsEditor } from './components/items_editor.js';
-import { persistMappingsForItems } from '../lib/associations.js';
+import { persistMappingsForItems } from './lib/associations.js';
 const COT_COLLECTION = 'cotizaciones_analizadas';
 
 const MAP_COLLECTION = 'mapeo_articulos';

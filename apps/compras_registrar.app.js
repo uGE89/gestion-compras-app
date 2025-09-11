@@ -6,7 +6,7 @@ import {
 import { ref, uploadBytes, getDownloadURL }
   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 import { ItemsEditor } from './components/items_editor.js';
-import { associateItemsBatch, persistMappingsForItems } from '../lib/associations.js';
+import { associateItemsBatch, persistMappingsForItems } from './lib/associations.js';
 
 
 
