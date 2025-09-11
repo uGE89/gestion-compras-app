@@ -24,7 +24,7 @@ export function normalizeAndFilterAlegra(rowsAlegra, cuentasArray, selectedCuent
     const signo = tipo.includes('ingreso') ? 'in' : (tipo.includes('egreso') ? 'out' : null);
 
     out.push({
-      id: r['Número'] || cryptoId('A'),           // no se usa para T1
+      id: String(r['Número'] ?? '').trim() || cryptoId('A'), // no se usa para T1
       cuentaId,
       fecha: toISODate(r['Fecha']),
       notas: (r['Notas'] || '').toString(),       // T1: Banco.NumConfirm ↔ Alegra.Notas
