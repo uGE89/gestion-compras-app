@@ -81,8 +81,24 @@ export async function readAnyTable(file) {
 // CSV → detecta la fila que contiene "Fecha" y "Número de confirmación"
 async function readCSV(file) {
   await ensureCDNs();
+  const text = await file.text();
+  const lines = text.split(/\r?\n/);
+  let delimiter = ',';
+  let bodyLines = lines;
+  const m = lines[0]?.match(/^sep=(.)/i);
+  if (m) {
+    delimiter = m[1];
+    bodyLines = lines.slice(1);
+  } else {
+    const first = lines[0] || '';
+    const semiCount = (first.match(/;/g) || []).length;
+    const commaCount = (first.match(/,/g) || []).length;
+    delimiter = semiCount > commaCount ? ';' : ',';
+  }
+  const body = bodyLines.join('\n');
   return new Promise((resolve, reject) => {
-    window.Papa.parse(file, {
+    window.Papa.parse(body, {
+      delimiter,
       header: false,
       skipEmptyLines: true,
       complete: (res) => {
