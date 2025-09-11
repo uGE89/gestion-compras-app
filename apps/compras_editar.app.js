@@ -25,6 +25,7 @@ export default {
     let original = null;
     let imageUrls = [];           // existentes + nuevas
     let totalFacturaAI = 0;       // total detectado por IA o el del documento
+    let itemsEditor;              // instancia del editor de ítems
     const productCatalog = appState?.productCatalog || [];
 
     // ===== Utils =====
@@ -148,7 +149,7 @@ export default {
             <div><label class="text-sm text-slate-700">Fecha</label><input id="fecha" type="date" class="p-2 border rounded w-full" required></div>
             <div><label class="text-sm text-slate-700">No. Factura</label><input id="numero_factura" type="text" class="p-2 border rounded w-full" required></div>
             <div><label class="text-sm text-slate-700">Proveedor</label><input id="proveedor" type="text" class="p-2 border rounded w-full" required></div>
-            <div><label class="text-sm text-slate-700">Monto Total (Factura)</label><input id="total" type="number" step="0.01" class="p-2 border rounded w-full bg-slate-100" readonly></div>
+            <div><label class="text-sm text-slate-700">Monto Total (Factura)</label><input id="total" type="number" step="0.01" class="p-2 border rounded w-full"></div>
             <div><label class="text-sm text-slate-700">Sucursal</label><input id="sucursal" type="text" class="p-2 border rounded w-full" required></div>
             <div><label class="text-sm text-slate-700">Transporte</label><input id="transporte" type="text" class="p-2 border rounded w-full" required></div>
             <div class="md:col-span-2"><label class="text-sm text-slate-700">Faltantes o Comentarios</label><input id="faltantes" type="text" class="p-2 border rounded w-full" required></div>
@@ -189,13 +190,20 @@ export default {
 
     // ===== Montar ItemsEditor =====
     const calcContainer = $('#calculation-section', root);
-    const itemsEditor = ItemsEditor({
+    itemsEditor = ItemsEditor({
       container: calcContainer,
       productCatalog,
       initialIVA: original.iva_aplicado ?? 15,
       initialTC:  original.tipo_cambio_aplicado ?? 1,
       initialTotalAI: Number(original.total || 0),
       onChange: () => {}
+    });
+
+    // Sincronizar cuando el usuario edite "Monto Total (Factura)"
+    $('#total', root).addEventListener('input', (e) => {
+      const v = parseLocalFloat(e.target.value);
+      totalFacturaAI = isFinite(v) && v >= 0 ? v : 0;
+      itemsEditor.setInvoiceTotal(totalFacturaAI); // refleja en "Total Factura (IA)"
     });
 
     // Cargar ítems existentes
@@ -357,6 +365,8 @@ export default {
           };
         });
       })();
+
+      totalFacturaAI = parseLocalFloat($('#total', root).value);
 
       const patch = {
         fecha: $('#fecha', root).value,
