@@ -12,5 +12,6 @@ export const registry = {
   'cotizaciones_comparar':  () => import('../apps/cotizaciones_comparar.app.js'),
   'cotizaciones_detalles' : () => import('../apps/cotizaciones_detalles.app.js'),
   'cotizaciones_editar'   : () => import('../apps/cotizaciones_editar.app.js'),
+  'conciliacion'          : () => import('../apps/conciliacion.app.js'),
 
 };
