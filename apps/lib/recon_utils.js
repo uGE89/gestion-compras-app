@@ -117,20 +117,30 @@ export function autoHeaderObjects(matrixOrRows) {
   }
   // Asegurar matriz (array de arrays)
   const M = Array.isArray(matrixOrRows[0]) ? matrixOrRows : matrixOrRows.map(row => Object.values(row));
-  const isHeaderRow = (arr=[]) => {
-    const cells = arr.map(x => String(x||'').toLowerCase());
+  const isHeaderRow = (arr = []) => {
+    const cells = arr.map(x => String(x || '').toLowerCase());
     const hasFecha = cells.some(c => c === 'fecha');
     const hasConfirm = cells.some(c => c.includes('número de confirmación') || c.includes('numero de confirmacion'));
-    return hasFecha && hasConfirm;
+    const hasCuenta = cells.some(c => c === 'cuenta');
+    const hasValorNIO = cells.some(c => c === 'valor en nio');
+    return hasFecha && (hasConfirm || (hasCuenta && hasValorNIO));
   };
   const hIdx = M.findIndex(isHeaderRow);
+  const extractHeader = (arr = []) => {
+    const raw = arr.map(x => String(x || '').trim());
+    const selected = raw.map((h, i) => ({ h, i })).filter(({ h }) => h && !/^unnamed/i.test(h));
+    return {
+      header: selected.map(s => s.h),
+      indices: selected.map(s => s.i),
+    };
+  };
   if (hIdx === -1) {
     // Fallback: usa la primera fila como encabezado
-    const header = (M[0] || []).map(String);
-    return (M.slice(1)).map(r => Object.fromEntries(header.map((h,i)=>[h, r[i] ?? ''])));
+    const { header, indices } = extractHeader(M[0] || []);
+    return M.slice(1).map(r => Object.fromEntries(header.map((h, i) => [h, r[indices[i]] ?? ''])));
   }
-  const header = (M[hIdx] || []).map(x => String(x||'').trim());
-  const body = M.slice(hIdx + 1);
-  return body.map(r => Object.fromEntries(header.map((h,i)=>[h, r[i] ?? ''])));
+  const { header, indices } = extractHeader(M[hIdx] || []);
+  const body = M.slice(hIdx + 1).map(r => indices.map(i => r[i]));
+  return body.map(r => Object.fromEntries(header.map((h, i) => [h, r[i] ?? ''])));
 }
 
