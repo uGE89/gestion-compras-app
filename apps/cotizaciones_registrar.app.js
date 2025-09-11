@@ -1,19 +1,13 @@
 // apps/cotizaciones_registrar.app.js
 import {
-  collection, addDoc, doc, getDoc, setDoc,
-  serverTimestamp, increment
+  collection, addDoc,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL }
   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 import { ItemsEditor } from './components/items_editor.js';
 const COT_COLLECTION = 'cotizaciones_analizadas';
-
-const MAP_COLLECTION = 'mapeo_articulos';
-const slugifyDesc = (s='') =>
-  s.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-   .toLowerCase()
-   .replace(/[^a-z0-9]+/g,'-')
-   .replace(/^-+|-+$/g,'');
+import { associateItemsBatch, persistMappingsForItems } from '../lib/associations.js';
 
 
 
@@ -67,11 +61,6 @@ export default {
     const dataUrlToBlob = d => fetch(d).then(r=>r.blob());
     async function uploadToStorage(fileOrBlob, path){
       const sref=ref(storage,path); const snap=await uploadBytes(sref,fileOrBlob); return getDownloadURL(snap.ref); }
-
-    async function findAssociation(desc){
-      if(!desc) return null; const id=desc.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-');
-      const snap=await getDoc(doc(db, MAP_COLLECTION,id)); return snap.exists()?snap.data():null;
-    }
 
     // === UI
     container.innerHTML = `
@@ -171,8 +160,7 @@ export default {
           $('#moneda').value    = ai.moneda || 'MXN';
           $('#tc').value        = ai.tipo_cambio || 1;
 
-          const mapped = await Promise.all((ai.items||[]).map(async raw=>{
-            const assoc = await findAssociation(raw.descripcion);
+          const baseItems = (ai.items || []).map(raw => {
             const cant  = parseF(raw.cantidad);
             const total = parseF(raw.total_linea);
             const uxp   = 1;
@@ -185,13 +173,11 @@ export default {
               total_linea_base: total,     // lo guardamos para tener referencia
               precio_unit: punit,          // clave para comparación
               clave_proveedor: raw.clave_proveedor || null,
-              clave_catalogo: assoc?.clave_catalogo || null,
-              desc_catalogo:  assoc?.desc_catalogo  || null,
-              autoAssociated: !!assoc,
               recibido: false
             };
-          }));
-          editor.addItems(mapped);
+          });
+          const withAssoc = await associateItemsBatch(db, $('#proveedor').value || ai.proveedor || '', baseItems);
+          editor.addItems(withAssoc.map(it => ({ ...it, autoAssociated: !!it.clave_catalogo })));
           toast('Cotización extraída. Revisa precios/cantidades.');
         } else {
           toast('La IA no devolvió datos. Completa manualmente.', 'error');
@@ -236,19 +222,7 @@ export default {
       try{
         await addDoc(collection(db, COT_COLLECTION), docData);
 
-        // Persistir mapeos
-        for (const it of items){
-          if (it.clave_catalogo && it.descripcion_factura){
-            const id = it.descripcion_factura.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-');
-            await setDoc(doc(db, MAP_COLLECTION, id), {
-              descripcion_proveedor: it.descripcion_factura,
-              clave_catalogo: it.clave_catalogo,
-              desc_catalogo: it.desc_catalogo,
-              ultima_actualizacion: serverTimestamp(),
-              conteo_usos: increment(1)
-            }, { merge:true });
-          }
-        }
+        await persistMappingsForItems(db, $('#proveedor').value.trim(), editor.getItems());
 
         toast('Cotización guardada.');
         location.hash = `#/cotizaciones_comparar?rfq=${rfqId}`;

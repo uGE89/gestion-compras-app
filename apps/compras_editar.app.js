@@ -1,19 +1,14 @@
 // apps/compras_editar.app.js
 import {
-  collection, doc, getDoc, updateDoc, setDoc,
-  query, where, getDocs, serverTimestamp, increment
+  collection, doc, getDoc, updateDoc,
+  query, where, getDocs, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL }
   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 import { ItemsEditor } from './components/items_editor.js';
+import { persistMappingsForItems } from '../lib/associations.js';
 
 const MAP_COLLECTION = 'mapeo_articulos';
-const slugifyDesc = (s='') =>
-  s.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-   .toLowerCase()
-   .replace(/[^a-z0-9]+/g,'-')
-   .replace(/^-+|-+$/g,'');
-
 
 export default {
   title: 'Editar Compra',
@@ -381,20 +376,8 @@ export default {
       try {
         await updateDoc(doc(db, 'compras', id), patch);
 
-        // Persistir asociaciones en mapeo
         const itemsForMap = itemsEditor.getItems();
-        for (const it of itemsForMap) {
-          if (it.clave_catalogo && it.descripcion_factura) {
-            const mapId = it.descripcion_factura.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-');
-            await setDoc(doc(db,  MAP_COLLECTION, mapId), {
-              descripcion_proveedor: it.descripcion_factura,
-              clave_catalogo: it.clave_catalogo,
-              desc_catalogo: it.desc_catalogo,
-              ultima_actualizacion: serverTimestamp(),
-              conteo_usos: increment(1)
-            }, { merge: true });
-          }
-        }
+        await persistMappingsForItems(db, proveedor, itemsForMap);
 
         showToast('Registro actualizado con éxito.', 'success');
         location.hash = '#/compras_historial';

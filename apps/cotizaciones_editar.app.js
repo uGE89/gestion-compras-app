@@ -1,16 +1,12 @@
 // apps/cotizaciones_editar.app.js
 import {
-  doc, getDoc, updateDoc, setDoc, serverTimestamp, increment
+  doc, getDoc, updateDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { ItemsEditor } from './components/items_editor.js';
+import { persistMappingsForItems } from '../lib/associations.js';
 const COT_COLLECTION = 'cotizaciones_analizadas';
 
 const MAP_COLLECTION = 'mapeo_articulos';
-const slugifyDesc = (s='') =>
-  s.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-   .toLowerCase()
-   .replace(/[^a-z0-9]+/g,'-')
-   .replace(/^-+|-+$/g,'');
 
 
 export default {
@@ -274,19 +270,7 @@ itemsEditor.setInvoiceTotal(Number(data.total || 0));
       try {
         await updateDoc(doc(db, COT_COLLECTION,id), payload);
 
-        // Persistir mapeos usados
-        for (const it of rawItems) {
-          if (it.clave_catalogo && it.descripcion_factura) {
-            const mapId = it.descripcion_factura.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-');
-            await setDoc(doc(db, MAP_COLLECTION, mapId), {
-              descripcion_proveedor: it.descripcion_factura,
-              clave_catalogo: it.clave_catalogo,
-              desc_catalogo: it.desc_catalogo,
-              ultima_actualizacion: serverTimestamp(),
-              conteo_usos: increment(1)
-            }, { merge:true });
-          }
-        }
+        await persistMappingsForItems(db, $('#proveedor', root).value.trim(), rawItems);
 
         showToast('Cambios guardados.');
         location.hash = `#/cotizaciones_detalles?id=${encodeURIComponent(id)}`;
