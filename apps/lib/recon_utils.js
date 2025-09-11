@@ -78,18 +78,24 @@ export async function readAnyTable(file) {
   return readXLSX(file);
 }
 
+// CSV → detecta la fila que contiene "Fecha" y "Número de confirmación"
 async function readCSV(file) {
   await ensureCDNs();
   return new Promise((resolve, reject) => {
     window.Papa.parse(file, {
-      header: true,
+      header: false,
       skipEmptyLines: true,
-      complete: (res) => resolve(res.data || []),
+      complete: (res) => {
+        const rows = res.data || [];
+        const objs = autoHeaderObjects(rows);
+        resolve(objs);
+      },
       error: reject,
     });
   });
 }
 
+// XLS/XLSX → lee como matriz y reencabeza
 async function readXLSX(file) {
   await ensureCDNs();
   const data = await file.arrayBuffer();
@@ -97,7 +103,34 @@ async function readXLSX(file) {
   // Toma la primera hoja
   const wsName = wb.SheetNames[0];
   const ws = wb.Sheets[wsName];
-  const rows = window.XLSX.utils.sheet_to_json(ws, { defval: '' });
-  return rows;
+  const matrix = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  return autoHeaderObjects(matrix);
+}
+
+// ===== Reencabezado genérico: encuentra la fila con "Fecha" y "Número de confirmación"
+export function autoHeaderObjects(matrixOrRows) {
+  // Si ya viene como objetos con 'Fecha', devolver tal cual
+  if (Array.isArray(matrixOrRows) && matrixOrRows.length && !Array.isArray(matrixOrRows[0])) {
+    const maybe = matrixOrRows[0];
+    const keys = Object.keys(maybe).map(k => k.toLowerCase());
+    if (keys.some(k => k.includes('fecha'))) return matrixOrRows;
+  }
+  // Asegurar matriz (array de arrays)
+  const M = Array.isArray(matrixOrRows[0]) ? matrixOrRows : matrixOrRows.map(row => Object.values(row));
+  const isHeaderRow = (arr=[]) => {
+    const cells = arr.map(x => String(x||'').toLowerCase());
+    const hasFecha = cells.some(c => c === 'fecha');
+    const hasConfirm = cells.some(c => c.includes('número de confirmación') || c.includes('numero de confirmacion'));
+    return hasFecha && hasConfirm;
+  };
+  const hIdx = M.findIndex(isHeaderRow);
+  if (hIdx === -1) {
+    // Fallback: usa la primera fila como encabezado
+    const header = (M[0] || []).map(String);
+    return (M.slice(1)).map(r => Object.fromEntries(header.map((h,i)=>[h, r[i] ?? ''])));
+  }
+  const header = (M[hIdx] || []).map(x => String(x||'').trim());
+  const body = M.slice(hIdx + 1);
+  return body.map(r => Object.fromEntries(header.map((h,i)=>[h, r[i] ?? ''])));
 }
 
