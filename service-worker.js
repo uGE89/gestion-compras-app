@@ -1,6 +1,6 @@
 // service-worker.js
 // ⇨ Cambiá este número en cada deploy para invalidar caché viejo.
-const APP_VERSION = '2025.09.07-5';
+const APP_VERSION = '2025.09.07-6';
 const PREFIX     = 'gestion-compras-cache-';
 const CACHE_NAME = `${PREFIX}${APP_VERSION}`;
 
@@ -74,7 +74,6 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
-  const accept = req.headers.get('accept') || '';
 
   // 1) No interceptar nada que no sea GET (deja pasar POST: BigQuery)
   if (req.method !== 'GET') {
@@ -88,15 +87,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3) HTML (navegación o fetch de subpáginas) → network-first (fallback index)
-  if (req.mode === 'navigate' || req.destination === 'document' || accept.includes('text/html')) {
-    event.respondWith(networkFirst(req, '/index.html'));
+  // 3) JS/CSS/Workers → network-first (siempre lo más nuevo)
+  if (req.destination === 'script' || req.destination === 'style' || req.destination === 'worker') {
+    event.respondWith(networkFirst(req));
     return;
   }
 
-  // 4) JS/CSS/Workers → network-first (siempre lo más nuevo)
-  if (req.destination === 'script' || req.destination === 'style' || req.destination === 'worker') {
-    event.respondWith(networkFirst(req));
+  // 4) HTML (solo navegaciones/documentos) → network-first (fallback index)
+  if (req.mode === 'navigate' || req.destination === 'document') {
+    event.respondWith(networkFirst(req, '/index.html'));
     return;
   }
 
