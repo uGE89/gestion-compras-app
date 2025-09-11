@@ -149,7 +149,7 @@ export default {
             <div><label class="text-sm text-slate-700">Fecha</label><input id="fecha" type="date" class="p-2 border rounded w-full" required></div>
             <div><label class="text-sm text-slate-700">No. Factura</label><input id="numero_factura" type="text" class="p-2 border rounded w-full" required></div>
             <div><label class="text-sm text-slate-700">Proveedor</label><input id="proveedor" type="text" class="p-2 border rounded w-full" required></div>
-            <div><label class="text-sm text-slate-700">Monto Total (Factura)</label><input id="total" type="number" step="0.01" class="p-2 border rounded w-full"></div>
+            <div><label class="text-sm text-slate-700">Monto Total (Factura)</label><input id="total" type="number" step="0.01" min="0" inputmode="decimal" class="p-2 border rounded w-full"></div>
             <div><label class="text-sm text-slate-700">Sucursal</label><input id="sucursal" type="text" class="p-2 border rounded w-full" required></div>
             <div><label class="text-sm text-slate-700">Transporte</label><input id="transporte" type="text" class="p-2 border rounded w-full" required></div>
             <div class="md:col-span-2"><label class="text-sm text-slate-700">Faltantes o Comentarios</label><input id="faltantes" type="text" class="p-2 border rounded w-full" required></div>
@@ -204,6 +204,11 @@ export default {
       const v = parseLocalFloat(e.target.value);
       totalFacturaAI = isFinite(v) && v >= 0 ? v : 0;
       itemsEditor.setInvoiceTotal(totalFacturaAI); // refleja en "Total Factura (IA)"
+    });
+
+    $('#total', root).addEventListener('blur', (e) => {
+      const v = parseLocalFloat(e.target.value);
+      e.target.value = (isFinite(v) ? v : 0).toFixed(2);
     });
 
     // Cargar ítems existentes
