@@ -139,7 +139,7 @@ export default {
             </div>
             <div>
               <label class="block text-sm text-slate-700">Monto Total (Factura)</label>
-              <input id="total" type="number" step="0.01" class="p-2 border rounded w-full">
+              <input id="total" type="number" step="0.01" inputmode="decimal" class="p-2 border rounded w-full">
             </div>
             <div>
               <label class="block text-sm text-slate-700">Sucursal</label>
@@ -179,10 +179,12 @@ export default {
       onChange: () => {}
     });
 
-    // Permitir editar manualmente el monto total de la factura
-    $('#total', root).addEventListener('input', (e) => {
-      totalFacturaAI = parseLocalFloat(e.target.value);
-      itemsEditor.setInvoiceTotal(totalFacturaAI);
+    // Sincroniza el total escrito a mano con el editor (diferencias/summary)
+    const totalInput = $('#total', root);
+    totalInput.addEventListener('input', () => {
+      const v = parseLocalFloat(totalInput.value);
+      totalFacturaAI = v;
+      itemsEditor.setInvoiceTotal(v); // actualiza "Total Factura (IA)" y recalcula diferencias
     });
 
     // ===== Subida + IA + Mapeo (ANEXAR SIEMPRE) =====
@@ -304,6 +306,9 @@ export default {
 
       const ivaPercent = parseFloat($('#ie-iva', root)?.value || '0');
       const tipoCambio = parseFloat($('#ie-tc', root)?.value || '1');
+
+      // Asegura el total a partir del input
+      totalFacturaAI = parseLocalFloat($('#total', root).value);
 
       // Final items desde el editor
       const rawItems = itemsEditor.getItems();
