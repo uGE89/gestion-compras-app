@@ -67,6 +67,7 @@ export default {
       // Normaliza Banco con TC global
       const Bpack = normalizeBanco(bancoRows, { cuentaId, tipoCambio: tc });
       B = Bpack.rows; periodo = { desde: Bpack.desde, hasta: Bpack.hasta };
+      window.__periodo = periodo;
 
       idx = buildIndexes(A);
       // Restaurar sesión
@@ -119,9 +120,9 @@ export default {
       const cands = candidatesForBankRow(b, idx, { cuentaId, dateWindow: DATE_WINDOW });
       renderRightPanel(b, cands, ui, session, (candIdx) => fixCandidate(bid, candIdx));
       // marca selección visual
-      container.querySelectorAll('[data-bid]').forEach(x => x.classList.remove('bg-blue-50'));
+      container.querySelectorAll('[data-bid]').forEach(x => x.classList.remove('bg-blue-50','ring-2','ring-blue-500'));
       const node = container.querySelector(`[data-bid="${bid}"]`);
-      if (node) node.classList.add('bg-blue-50');
+      if (node) node.classList.add('bg-blue-50','ring-2','ring-blue-500');
     }
 
     function maybeEnableProcess() {
@@ -251,6 +252,13 @@ function renderLeftList(B = [], ui, session) {
     ui.chkOnlyPend.onchange = () => {
       session.onlyPend = ui.chkOnlyPend.checked;
       renderLeftList(B, ui, session);
+      const cuentaId = Number(document.querySelector('#cuenta')?.value || 0);
+      if (cuentaId && (window.__periodo?.desde || window.__periodo?.hasta)) {
+        saveSession(
+          { cuentaId, desdeISO: window.__periodo.desde, hastaISO: window.__periodo.hasta },
+          session
+        );
+      }
     };
     ui.chkOnlyPend.checked = !!session.onlyPend;
   }
