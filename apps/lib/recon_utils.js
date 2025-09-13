@@ -24,6 +24,17 @@ export function parseNumberUS(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+// ===== Normalización básica =====
+// Elimina diacríticos, colapsa espacios y convierte a minúsculas
+export function normalizeText(str) {
+  return String(str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
 // ===== Fechas a ISO (YYYY-MM-DD) =====
 export function toISODate(any) {
   if (!any) return null;
@@ -170,9 +181,9 @@ export function autoHeaderObjects(matrixOrRows) {
   // Asegurar matriz (array de arrays)
   const M = Array.isArray(matrixOrRows[0]) ? matrixOrRows : matrixOrRows.map(row => Object.values(row));
   const isHeaderRow = (arr = []) => {
-    const cells = arr.map(x => String(x || '').toLowerCase());
+    const cells = arr.map(normalizeText);
     const hasFecha = cells.some(c => c === 'fecha');
-    const hasConfirm = cells.some(c => c.includes('número de confirmación') || c.includes('numero de confirmacion'));
+    const hasConfirm = cells.some(c => c.includes('numero de confirmacion') || c.includes('nroconfirmacion'));
     const hasCuenta = cells.some(c => c === 'cuenta');
     const hasValorNIO = cells.some(c => c === 'valor en nio');
     return hasFecha && (hasConfirm || (hasCuenta && hasValorNIO));
@@ -180,7 +191,9 @@ export function autoHeaderObjects(matrixOrRows) {
   const hIdx = M.findIndex(isHeaderRow);
   const extractHeader = (arr = []) => {
     const raw = arr.map(x => String(x || '').trim());
-    const selected = raw.map((h, i) => ({ h, i })).filter(({ h }) => h && !/^unnamed/i.test(h));
+    const selected = raw
+      .map((h, i) => ({ h: normalizeText(h), i }))
+      .filter(({ h }) => h && !/^unnamed/.test(h));
     return {
       header: selected.map(s => s.h),
       indices: selected.map(s => s.i),
