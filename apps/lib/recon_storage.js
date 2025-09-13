@@ -1,4 +1,3 @@
-// apps/lib/recon_storage.js
 import { buildStorageKey } from './recon_config.js';
 import { openDbEnsureStores } from './idb_utils.js';
 
@@ -12,20 +11,25 @@ export function saveSession({ cuentaId, desdeISO, hastaISO }, stateObj) {
   localStorage.setItem(key, JSON.stringify(stateObj));
 }
 
-// ---------- Tablas parseadas ----------
+// ---------- Tablas parseadas (IndexedDB: ff-concilia/tables) ----------
 const STORE_TABLES = 'tables';
 function tablesKey({ cuentaId, desdeISO, hastaISO }) {
   return `tables:${cuentaId}:${desdeISO || 'na'}:${hastaISO || 'na'}`;
 }
+
 export async function saveParsedTables({ cuentaId, desdeISO, hastaISO, alegraRows, bancoRows }) {
   const db = await openDbEnsureStores([STORE_TABLES]);
   const tx = db.transaction(STORE_TABLES, 'readwrite');
   await new Promise((res, rej) => {
-    const req = tx.objectStore(STORE_TABLES).put({ alegraRows, bancoRows, ts: Date.now() }, tablesKey({ cuentaId, desdeISO, hastaISO }));
+    const req = tx.objectStore(STORE_TABLES).put(
+      { alegraRows, bancoRows, ts: Date.now() },
+      tablesKey({ cuentaId, desdeISO, hastaISO })
+    );
     req.onsuccess = () => res();
     req.onerror = () => rej(req.error);
   });
 }
+
 export async function loadParsedTables({ cuentaId, desdeISO, hastaISO }) {
   const db = await openDbEnsureStores([STORE_TABLES]);
   const tx = db.transaction(STORE_TABLES, 'readonly');
@@ -36,7 +40,7 @@ export async function loadParsedTables({ cuentaId, desdeISO, hastaISO }) {
   });
 }
 
-// ---------- Preferencias ----------
+// ---------- Preferencias (localStorage) ----------
 const PREFS_KEY = 'conciliacion:prefs';
 export function savePrefs(p) { localStorage.setItem(PREFS_KEY, JSON.stringify(p || {})); }
 export function loadPrefs() { try { return JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); } catch { return {}; } }
