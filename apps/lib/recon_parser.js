@@ -6,7 +6,10 @@ import { parseNumberUS, toISODate, cryptoId } from './recon_utils.js';
 export function buildAccountNameToIdMap(cuentasArray) {
   const norm = s => s?.toString().trim().toLowerCase().replace(/\s+/g, ' ') || '';
   const map = new Map();
-  for (const c of (cuentasArray || [])) map.set(norm(c.nombre), Number(c.id));
+  for (const c of (cuentasArray || [])) {
+    const key = norm(c?.nombre ?? c?.name); // acepta 'nombre' o 'name'
+    if (key) map.set(key, Number(c.id));
+  }
   return { getIdByName: (name) => map.get(norm(name)) ?? null };
 }
 
@@ -44,12 +47,24 @@ export function normalizeBanco(rowsBanco, { cuentaId, tipoCambio=1 }) {
   const out = [];
   let minDate = null, maxDate = null;
   for (const r of rowsBanco || []) {
-    const fecha = toISODate(r['fecha']);
+    const fecha = toISODate(r['fecha'] || r['date'] || r['fecha operacion']);
     if (!fecha) continue;
-    const confirm = (r['numero de confirmacion'] || r['nroconfirmacion'] || '').toString().trim();
-    const descripcion = (r['descripcion'] || '').toString();
-    const deb = parseNumberUS(r['debito']);
-    const cred = parseNumberUS(r['credito']);
+    const confirm = (r['numero de confirmacion'] || r['nroconfirmacion'] ||
+                    r['numero de referencia']   || r['referencia'] ||
+                    r['ref'] || '').toString().trim();
+    const descripcion = (r['descripcion'] || r['detalle'] || r['concepto'] || '').toString();
+    let deb = parseNumberUS(r['debito'] ?? r['débito']);
+    let cred = parseNumberUS(r['credito'] ?? r['crédito']);
+
+    // Soporte a esquema de UNA columna (Monto/Importe/Valor) + naturaleza
+    if (!deb && !cred) {
+      const monto = parseNumberUS(r['monto'] ?? r['importe'] ?? r['valor']);
+      const tipo  = String(r['tipo'] || r['naturaleza'] || '').toLowerCase();
+      if (monto) {
+        if (monto < 0 || /(debito|cargo)/.test(tipo)) deb = Math.abs(monto);
+        else cred = Math.abs(monto);
+      }
+    }
 
     // Signo Banco: Crédito=in, Débito=out
     const signo = cred > 0 ? 'in' : (deb > 0 ? 'out' : null);
