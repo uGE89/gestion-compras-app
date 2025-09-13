@@ -3,7 +3,7 @@ import { ensureCDNs, readAnyTable, detectSourceType } from './lib/recon_utils.js
 import { normalizeAndFilterAlegra, normalizeBanco } from './lib/recon_parser.js';
 import { buildIndexes, candidatesForBankRow } from './lib/recon_matcher.js';
 import { DATE_WINDOW } from './lib/recon_config.js';
-import { loadSession, saveSession } from './lib/recon_storage.js';
+import { loadSession, saveSession, saveParsedTables, loadParsedTables, savePrefs, loadPrefs } from './lib/recon_storage.js';
 import { clearCache } from './lib/mapping_cache.js'; // opcional si usás asociaciones aquí después
 
 function normalizeSession(s) {
@@ -31,6 +31,12 @@ export default {
 
     // Cargar librerías
     await ensureCDNs();
+
+    // Restaurar preferencias
+    const prefs = loadPrefs();
+    if (prefs?.cuentaId) ui.cuenta.value = String(prefs.cuentaId);
+    if (prefs?.tc) ui.tc.value = String(prefs.tc);
+    if (ui.chkOnlyPend) ui.chkOnlyPend.checked = !!prefs.onlyPend;
 
     // Cargar catálogo de cuentas de manera fija por ahora
     const accountMappingsArray = [
@@ -75,9 +81,9 @@ export default {
       maybeEnableProcess();
     });
 
-    ui.btnProcesar.addEventListener('click', () => {
+    ui.btnProcesar.addEventListener('click', async () => {
       // opcional: clear cache de asociaciones si tu flujo lo usa
-      try { clearCache(); } catch {}
+      try { clearCache?.(); } catch {}
       const cuentaId = Number(ui.cuenta.value);
       const tc = Number(ui.tc.value || '1');
 
@@ -107,6 +113,12 @@ export default {
       renderLeftList(B, ui, session);
       ui.panelInfo.textContent = `Alegra (filtrada): ${A.length} • Banco: ${B.length} • Periodo ${periodo.desde || '?'} a ${periodo.hasta || '?'}`;
       ui.paramsBanner.classList.add('hidden');
+
+      // Persistir tablas y preferencias
+      savePrefs({ cuentaId, tc, onlyPend: !!ui.chkOnlyPend?.checked });
+      try {
+        await saveParsedTables({ cuentaId, desdeISO: periodo.desde, hastaISO: periodo.hasta, alegraRows, bancoRows });
+      } catch (e) { console.warn('saveParsedTables error', e); }
     });
 
     // Selección en lista Banco
