@@ -73,22 +73,43 @@ function normalizeEntry(raw = {}) {
   if (!Array.isArray(alegraIds)) {
     alegraIds = String(alegraIds ?? '').split(/[|,;\s]+/).filter(Boolean);
   }
-  const monto = Number(
-    typeof raw.montoNio === 'string' ? raw.montoNio.replace(/,/g,'') : raw.montoNio
-  );
   const meta = (raw.meta && typeof raw.meta === 'object')
     ? { ...raw.meta }
     : (raw.meta ? safeParseJSON(raw.meta) : {});
+
+  const errors = [];
+
+  const cuentaId = Number(raw.cuentaId);
+  if (!Number.isFinite(cuentaId)) errors.push('cuentaId');
+
+  const fecha = raw.fecha && !Number.isNaN(Date.parse(raw.fecha)) ? raw.fecha : null;
+  if (!fecha) errors.push('fecha');
+
+  const signo = (raw.signo || '').toString();
+  if (!['in', 'out'].includes(signo)) errors.push('signo');
+
+  const monto = Number(
+    typeof raw.montoNio === 'string' ? raw.montoNio.replace(/,/g, '') : raw.montoNio
+  );
+  if (!Number.isFinite(monto)) errors.push('montoNio');
+
+  if (errors.length) {
+    return { errors };
+  }
+
   return {
-    sig: raw.sig || null,
-    cuentaId: Number(raw.cuentaId),
-    fecha: raw.fecha,
-    signo: raw.signo,
-    nroConfirm: raw.nroConfirm ?? raw.numeroConfirmacion ?? null,
-    montoNio: Number.isFinite(monto) ? monto.toFixed(2) : '0.00',
-    descripcion: raw.descripcion || '',
-    alegraIds: Array.from(new Set(alegraIds)),
-    meta: { ...meta, ts: meta.ts || Date.now() },
+    value: {
+      sig: raw.sig || null,
+      cuentaId,
+      fecha,
+      signo,
+      nroConfirm: raw.nroConfirm ?? raw.numeroConfirmacion ?? null,
+      montoNio: monto.toFixed(2),
+      descripcion: raw.descripcion || '',
+      alegraIds: Array.from(new Set(alegraIds)),
+      meta: { ...meta, ts: meta.ts || Date.now() },
+    },
+    errors: null,
   };
 }
 function safeParseJSON(s) { try { return JSON.parse(s); } catch { return {}; } }
@@ -98,13 +119,20 @@ function safeParseJSON(s) { try { return JSON.parse(s); } catch { return {}; } }
  * mode='keep' => conserva existentes (no sobreescribe); 'overwrite' => reemplaza.
  */
 export async function masterImportEntries(entries = [], { mode = 'keep' } = {}) {
-  if (!Array.isArray(entries) || !entries.length) return { inserted: 0, updated: 0, skipped: 0, total: 0 };
+  if (!Array.isArray(entries) || !entries.length) return { inserted: 0, updated: 0, skipped: 0, total: 0, errors: [] };
   const db = await idbOpen();
   const tx = db.transaction(STORE_MASTER, 'readwrite');
   const store = tx.objectStore(STORE_MASTER);
   let inserted = 0, updated = 0, skipped = 0;
+  const errors = [];
   for (const r of entries) {
-    const e = normalizeEntry(r);
+    const { value: e, errors: errs } = normalizeEntry(r);
+    if (errs?.length) {
+      console.warn('Skipping invalid master entry', errs, r);
+      errors.push({ entry: r, errors: errs });
+      skipped++;
+      continue;
+    }
     const sig = e.sig || bankSignature(e);
     e.sig = sig;
     // ¿existe ya?
@@ -119,5 +147,5 @@ export async function masterImportEntries(entries = [], { mode = 'keep' } = {}) 
     exists ? updated++ : inserted++;
   }
   await new Promise((res) => { tx.oncomplete = () => res(); });
-  return { inserted, updated, skipped, total: entries.length };
+  return { inserted, updated, skipped, total: entries.length, errors };
 }
