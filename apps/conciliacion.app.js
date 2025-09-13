@@ -28,7 +28,10 @@ export default {
 
     // Handlers UI
     ui.tc.addEventListener('input', () => dirtyParamsBanner(ui));
-    ui.cuenta.addEventListener('change', () => dirtyParamsBanner(ui));
+    ui.cuenta.addEventListener('change', () => {
+      dirtyParamsBanner(ui);
+      maybeEnableProcess();
+    });
 
     ui.btnAlegra.addEventListener('change', async (e) => {
       alegraRows = await readAnyTable(e.target.files[0]);
