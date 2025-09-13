@@ -39,6 +39,8 @@ export default {
     if (prefs?.cuentaId) ui.cuenta.value = String(prefs.cuentaId);
     if (prefs?.tc) ui.tc.value = String(prefs.tc);
     if (ui.chkOnlyPend) ui.chkOnlyPend.checked = !!prefs.onlyPend;
+    // Intento de warm start (si existe cache para el último periodo usado)
+    await warmStartFromCache();
 
     // Cargar catálogo de cuentas de manera fija por ahora
     const accountMappingsArray = [
@@ -121,8 +123,8 @@ export default {
       ui.panelInfo.textContent = `Alegra (filtrada): ${A.length} • Banco: ${B.length} • Periodo ${periodo.desde || '?'} a ${periodo.hasta || '?'}`;
       ui.paramsBanner.classList.add('hidden');
 
-      // Persistir tablas y preferencias
-      savePrefs({ cuentaId, tc, onlyPend: !!ui.chkOnlyPend?.checked });
+      // Persistir tablas y preferencias (guardar último período para warm start)
+      savePrefs({ cuentaId, tc, onlyPend: !!ui.chkOnlyPend?.checked, lastPeriodo: periodo });
       try {
         await saveParsedTables({ cuentaId, desdeISO: periodo.desde, hastaISO: periodo.hasta, alegraRows, bancoRows });
       } catch (e) { console.warn('saveParsedTables error', e); }
@@ -236,6 +238,30 @@ export default {
 
     function maybeEnableProcess() {
       ui.btnProcesar.disabled = !(alegraRows.length && bancoRows.length && ui.cuenta.value);
+    }
+
+    // ===== Warm start: intenta cargar tablas parseadas desde IndexedDB =====
+    async function warmStartFromCache() {
+      try {
+        const p = loadPrefs() || {};
+        const cuentaId = Number(ui.cuenta.value || p.cuentaId || 0);
+        const desdeISO = p?.lastPeriodo?.desde || null;
+        const hastaISO = p?.lastPeriodo?.hasta || null;
+        if (!cuentaId || !desdeISO || !hastaISO) return; // no hay claves suficientes
+        const cached = await loadParsedTables({ cuentaId, desdeISO, hastaISO });
+        if (!cached) return;
+        alegraRows = Array.isArray(cached.alegraRows) ? cached.alegraRows : [];
+        bancoRows  = Array.isArray(cached.bancoRows)  ? cached.bancoRows  : [];
+        if (!alegraRows.length || !bancoRows.length) return;
+        // Marcar UI como "cargado desde cache"
+        ui.badgeAlegra.textContent = `${alegraRows.length} filas (cache)`;
+        ui.badgeBanco.textContent  = `${bancoRows.length} filas (cache)`;
+        ui.btnAlegra.classList.add('bg-green-50');
+        ui.btnBanco.classList.add('bg-green-50');
+        maybeEnableProcess();
+      } catch (err) {
+        console.warn('warmStartFromCache error', err);
+      }
     }
 
     async function fixCandidate(bid, candKey) {
