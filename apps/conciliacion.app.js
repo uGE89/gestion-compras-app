@@ -3,7 +3,7 @@ import { ensureCDNs, readAnyTable, detectSourceType } from './lib/recon_utils.js
 import { normalizeAndFilterAlegra, normalizeBanco } from './lib/recon_parser.js';
 import { buildIndexes, candidatesForBankRow } from './lib/recon_matcher.js';
 import { DATE_WINDOW } from './lib/recon_config.js';
-import { bankSignature, masterBulkHas, masterSave } from './lib/recon_master.js';
+import { bankSignature, masterBulkHas, masterSave, masterGetAll, masterImportEntries } from './lib/recon_master.js';
 import { loadSession, saveSession, saveParsedTables, loadParsedTables, savePrefs, loadPrefs } from './lib/recon_storage.js';
 import { clearCache } from './lib/mapping_cache.js'; // opcional si usás asociaciones aquí después
 
@@ -125,6 +125,63 @@ export default {
       try {
         await saveParsedTables({ cuentaId, desdeISO: periodo.desde, hastaISO: periodo.hasta, alegraRows, bancoRows });
       } catch (e) { console.warn('saveParsedTables error', e); }
+    });
+
+    // ====== Export/Import Master ======
+    ui.btnExportJSON.onclick = async () => {
+      const arr = await masterGetAll();
+      const text = JSON.stringify(arr, null, 2);
+      downloadText(`master-${new Date().toISOString().slice(0,10)}.json`, text, 'application/json');
+    };
+    ui.btnExportCSV.onclick = async () => {
+      const arr = await masterGetAll();
+      const csv = toCSV(arr);
+      downloadText(`master-${new Date().toISOString().slice(0,10)}.csv`, csv, 'text/csv;charset=utf-8');
+    };
+    ui.btnImport.onclick = () => ui.fileImport.click();
+    ui.fileImport.addEventListener('change', async (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      try {
+        const text = await f.text();
+        let result = { inserted: 0, updated: 0, skipped: 0, total: 0 };
+        if (/\.(json)$/i.test(f.name)) {
+          const data = JSON.parse(text);
+          const entries = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+          result = await masterImportEntries(entries, { mode: 'keep' });
+        } else {
+          await ensureCDNs(); // PapaParse
+          const parsed = window.Papa.parse(text, { header: true, skipEmptyLines: true });
+          const rows = parsed?.data || [];
+          // mapear columnas esperadas: sig, cuentaId, fecha, signo, nroConfirm, montoNio, descripcion, alegraIds, meta
+          const entries = rows.map(r => ({
+            sig: r.sig || null,
+            cuentaId: r.cuentaId,
+            fecha: r.fecha,
+            signo: r.signo,
+            nroConfirm: r.nroConfirm ?? r.numeroConfirmacion,
+            montoNio: r.montoNio,
+            descripcion: r.descripcion,
+            alegraIds: r.alegraIds,          // puede venir "a|b|c"
+            meta: r.meta                     // puede venir como JSON string
+          }));
+          result = await masterImportEntries(entries, { mode: 'keep' });
+        }
+        ui.masterStatus.textContent = `Importados: ${result.inserted}, actualizados: ${result.updated}, omitidos: ${result.skipped}`;
+        // refrescar banderas inMaster si ya hay B
+        if (B?.length) {
+          const sigs = B.map(b => b._sig || bankSignature(b));
+          const hasMap = await masterBulkHas(sigs);
+          B = B.map((b, i) => ({ ...b, inMaster: !!hasMap.get(sigs[i]), _sig: sigs[i] }));
+          renderLeftList(B, ui, session);
+          if (activeBid) selectBankRow(activeBid);
+        }
+      } catch (err) {
+        console.error('Import error', err);
+        ui.masterStatus.textContent = 'Error al importar (ver consola).';
+      } finally {
+        e.target.value = ''; // reset input
+      }
     });
 
     // Selección en lista Banco
@@ -257,6 +314,13 @@ function layout() {
         <input id="chkHideMaster" type="checkbox" class="accent-blue-600" checked>
         Excluir conciliados (master)
       </label>
+      <div class="ml-auto flex items-center gap-2">
+        <button id="btnExportJSON" class="px-2 py-1 text-xs bg-slate-100 border rounded">Export JSON</button>
+        <button id="btnExportCSV" class="px-2 py-1 text-xs bg-slate-100 border rounded">Export CSV</button>
+        <button id="btnImport" class="px-2 py-1 text-xs bg-slate-100 border rounded">Importar</button>
+        <input id="fileImport" type="file" accept=".json,.csv" class="hidden" />
+        <span id="masterStatus" class="text-xs text-gray-600"></span>
+      </div>
     </div>
 
     <div class="grid grid-cols-2 gap-3">
@@ -294,6 +358,11 @@ function getRefs(root) {
     paramsBanner: root.querySelector('#paramsBanner'),
     chkOnlyPend: root.querySelector('#chkOnlyPend'),
     chkHideMaster: root.querySelector('#chkHideMaster'),
+    btnExportJSON: root.querySelector('#btnExportJSON'),
+    btnExportCSV: root.querySelector('#btnExportCSV'),
+    btnImport: root.querySelector('#btnImport'),
+    fileImport: root.querySelector('#fileImport'),
+    masterStatus: root.querySelector('#masterStatus'),
   };
 }
 
@@ -378,5 +447,34 @@ function renderRightPanel(b, cands, ui, session, onFix) {
   if (ui?.chkAllCands) {
     ui.chkAllCands.onchange = () => renderRightPanel(b, cands, ui, session, onFix);
   }
+}
+
+// ====== helpers locales para export ======
+function toCSV(arr = []) {
+  const header = ['sig','cuentaId','fecha','signo','nroConfirm','montoNio','descripcion','alegraIds','meta'];
+  const esc = (v) => `"${String(v ?? '').replace(/"/g,'""')}"`;
+  const lines = [header.join(',')];
+  for (const e of arr) {
+    const row = {
+      sig: e.sig,
+      cuentaId: e.cuentaId,
+      fecha: e.fecha,
+      signo: e.signo,
+      nroConfirm: e.nroConfirm ?? '',
+      montoNio: e.montoNio,
+      descripcion: e.descripcion ?? '',
+      alegraIds: Array.isArray(e.alegraIds) ? e.alegraIds.join('|') : (e.alegraIds ?? ''),
+      meta: JSON.stringify(e.meta || {}),
+    };
+    lines.push(header.map(k => esc(row[k])).join(','));
+  }
+  return lines.join('\r\n');
+}
+function downloadText(filename, text, mime='text/plain') {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }
 
