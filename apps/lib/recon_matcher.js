@@ -141,7 +141,8 @@ function greedySum(cands, target, tol) {
 // Ranking: tier primero, luego |err|, luego lag, luego tamaño grupo
 function rankScore(x) {
   const tierW = { 'T1-1:1': 0, 'T1-all': 1, 'T2-1:1': 2, 'T2-all': 3, 'T3-1:1': 4, 'T3-1:N-greedy': 5 };
-  const t = tierW[x.tier] ?? 99;
+  const tiers = x.tiers ? Array.from(x.tiers) : [x.tier];
+  const t = Math.min(...tiers.map(t => tierW[t] ?? 99));
   const e = Math.abs(x.err);
   const lag = x.lagMax;
   const k = x.group.length;
