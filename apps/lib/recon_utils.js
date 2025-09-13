@@ -97,41 +97,66 @@ export function cryptoId(prefix='ID') {
 // ===== Lectura de archivos =====
 export async function readAnyTable(file) {
   if (!file) throw new Error('Archivo no proporcionado');
-  const name = file.name.toLowerCase();
-  if (name.endsWith('.csv')) return readCSV(file);
-  if (name.endsWith('.xls') || name.endsWith('.xlsx')) return readXLSX(file);
-  // fallback: intenta por contenido
-  if (file.type.includes('csv')) return readCSV(file);
-  return readXLSX(file);
+  try {
+    const name = file.name.toLowerCase();
+    if (name.endsWith('.csv')) return readCSV(file);
+    if (name.endsWith('.xls') || name.endsWith('.xlsx')) return readXLSX(file);
+    // fallback: intenta por contenido
+    if (file.type.includes('csv')) return readCSV(file);
+    return readXLSX(file);
+  } catch (err) {
+    console.error('Error leyendo archivo', err);
+    throw err;
+  }
 }
 
 // CSV → detecta la fila que contiene "Fecha" y "Número de confirmación"
 async function readCSV(file) {
   await ensureCDNs();
-  return new Promise((resolve, reject) => {
-    window.Papa.parse(file, {
+  try {
+    let text;
+    try {
+      const buf = await file.arrayBuffer();
+      text = new TextDecoder('iso-8859-1').decode(buf);
+    } catch (e) {
+      console.warn('Fallo al decodificar ArrayBuffer, usando file.text()', e);
+      text = await file.text();
+    }
+    // Limpiar BOM y línea sep=
+    text = text.replace(new RegExp('^\uFEFF'), '').replace(/^sep=.;?\r?\n/i, '');
+    // Detectar delimitador en la primera línea con contenido
+    const firstLine = text.split(/\r?\n/).find(l => l.trim()) || '';
+    const commaCount = (firstLine.match(/,/g) || []).length;
+    const semicolonCount = (firstLine.match(/;/g) || []).length;
+    const delimiter = semicolonCount > commaCount ? ';' : ',';
+    const res = window.Papa.parse(text, {
       header: false,
       skipEmptyLines: true,
-      complete: (res) => {
-        const rows = res.data || [];
-        const objs = autoHeaderObjects(rows);
-        resolve(objs);
-      },
-      error: reject,
+      delimiter,
     });
-  });
+    const rows = res.data || [];
+    return autoHeaderObjects(rows);
+  } catch (err) {
+    console.error('Error leyendo CSV', err);
+    throw err;
+  }
 }
 
 // XLS/XLSX → lee como matriz y reencabeza
 async function readXLSX(file) {
   await ensureCDNs();
-  const data = await file.arrayBuffer();
-  const wb = window.XLSX.read(data, { type: 'array' });
-  // Toma la primera hoja
-  const wsName = wb.SheetNames[0];
-  const ws = wb.Sheets[wsName];
-  const matrix = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-  return autoHeaderObjects(matrix);
+  try {
+    const data = await file.arrayBuffer();
+    const wb = window.XLSX.read(data, { type: 'array' });
+    // Toma la primera hoja
+    const wsName = wb.SheetNames[0];
+    const ws = wb.Sheets[wsName];
+    const matrix = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    return autoHeaderObjects(matrix);
+  } catch (err) {
+    console.error('Error leyendo XLSX', err);
+    throw err;
+  }
 }
 
 // ===== Reencabezado genérico: encuentra la fila con "Fecha" y "Número de confirmación"
