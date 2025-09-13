@@ -16,3 +16,8 @@ export function cachePut(k, v) {
   if (v) memo.set(key, v); else misses.add(key);
   return v;
 }
+
+export function clearCache() {
+  memo.clear();
+  misses.clear();
+}
