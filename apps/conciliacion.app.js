@@ -32,9 +32,27 @@ export default {
     // Cargar librerías
     await ensureCDNs();
 
-    // Cargar catálogo de cuentas desde appState si lo tenés ahí; si no, pedilo por input JSON
-    // Aquí asumimos que appState trae algo como appState.alegraCuentas
-    cuentasArray = appState?.alegraCuentas || [];
+    // Cargar catálogo de cuentas de manera fija por ahora
+    const accountMappingsArray = [
+      { id: 5,  name: "Ahorro Dólares CEF",              color: "#388E3C", moneda: "USD" },
+      { id: 4,  name: "Ahorro Dólares EFV",              color: "#388E3C", moneda: "USD" },
+      { id: 12, name: "Banpro ahorro",                    color: "#6EA8FE", moneda: "NIO" },
+      { id: 11, name: "Banpro Comercial",                 color: "#6EA8FE", moneda: "NIO" },
+      { id: 14, name: "Caja Bodegón",                     color: "#81C784", moneda: "NIO" },
+      { id: 1,  name: "Caja central",                     color: "#2196F3", moneda: "NIO" },
+      { id: 10, name: "Caja Coperna",                     color: "#4CAF50", moneda: "NIO" },
+      { id: 6,  name: "Caja Principal",                   color: "#1976D2", moneda: "NIO" },
+      { id: 8,  name: "Caja Sucursal",                    color: "#FFC107", moneda: "NIO" },
+      { id: 9,  name: "Caja Uge",                         color: "#FF9800", moneda: "NIO" },
+      { id: 7,  name: "Comodín",                          color: "#9E9E9E", moneda: "NIO" },
+      { id: 2,  name: "Cuenta corriente Bancentro",       color: "#388E3C", moneda: "NIO" },
+      { id: 13, name: "Efectivo POS - Terminal Coperna",  color: "#795548", moneda: "NIO" },
+      { id: 3,  name: "Tarjeta de crédito 1",             color: "#388E3C", moneda: "NIO" },
+      { id: 15, name: "BAC córdobas",                     color: "#D32F2F", moneda: "NIO" }
+    ];
+
+    // Adaptar a lo que espera el parser: {id, nombre}
+    cuentasArray = accountMappingsArray.map(a => ({ id: a.id, nombre: a.name, moneda: a.moneda, color: a.color }));
 
     // Handlers UI
     ui.tc.addEventListener('input', () => dirtyParamsBanner(ui));
