@@ -86,9 +86,27 @@ export function candidatesForBankRow(b, idx, { cuentaId, dateWindow = DATE_WINDO
   const grp = greedySum(sorted, b.montoNio, tolerance(b.montoNio));
   if (grp && grp.length) out.push(qualify(grp, 'T3-1:N-greedy'));
 
-  // Ranking final
-  const ranked = out
-    .filter(Boolean)
+  // === De-duplicación por grupo (mismos Alegra IDs) y fusión de tiers ===
+  const sig = (g) => g.map(x => x.id).sort().join('|');  // firma estable del grupo
+  const merged = new Map();
+  for (const cand of out.filter(Boolean)) {
+    const k = sig(cand.group);
+    const prev = merged.get(k);
+    if (!prev) {
+      merged.set(k, { ...cand, tiers: new Set([cand.tier]) });
+    } else {
+      // agrega tier y mejora métricas si este rankea mejor
+      prev.tiers.add(cand.tier);
+      if (rankScore(cand) < rankScore(prev)) {
+        prev.suma = cand.suma;
+        prev.err = cand.err;
+        prev.okTol = cand.okTol;
+        prev.lagMax = cand.lagMax;
+      }
+    }
+  }
+  // Ranking final (una entrada por grupo)
+  const ranked = Array.from(merged.values())
     .map(x => ({ ...x, score: rankScore(x) }))
     .sort((a, b2) => a.score - b2.score);
 

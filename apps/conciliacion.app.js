@@ -130,10 +130,10 @@ export default {
         selectBankRow(list[next].dataset.bid);
       } else if (ev.key === 'Enter' && activeBid) {
         // Fijar el mejor candidato visible
-        const node = container.querySelector('#cands [data-cand-idx]');
+        const node = container.querySelector('#cands [data-cand-key]');
         if (node) {
-          const i = Number(node.getAttribute('data-cand-idx')); // primer cand
-          fixCandidate(activeBid, i);
+          const k = node.getAttribute('data-cand-key'); // primer cand
+          fixCandidate(activeBid, k);
         }
       } else if (ev.key === 'j' || ev.key === 'k') {
         const dir = ev.key === 'j' ? 'ArrowDown' : 'ArrowUp';
@@ -148,7 +148,7 @@ export default {
       activeBid = bid;
       const cuentaId = Number(ui.cuenta.value);
       const cands = candidatesForBankRow(b, idx, { cuentaId, dateWindow: DATE_WINDOW });
-      renderRightPanel(b, cands, ui, session, (candIdx) => fixCandidate(bid, candIdx));
+      renderRightPanel(b, cands, ui, session, (candKey) => fixCandidate(bid, candKey));
       // marca selección visual
       container.querySelectorAll('[data-bid]').forEach(x => x.classList.remove('bg-blue-50','ring-2','ring-blue-500'));
       const node = container.querySelector(`[data-bid="${bid}"]`);
@@ -159,12 +159,14 @@ export default {
       ui.btnProcesar.disabled = !(alegraRows.length && bancoRows.length && ui.cuenta.value);
     }
 
-    function fixCandidate(bid, candIdx = 0) {
+    function fixCandidate(bid, candKey) {
       const b = B.find(x => x.id === bid);
       if (!b) return;
       const cuentaId = Number(ui.cuenta.value);
       const cands = candidatesForBankRow(b, idx, { cuentaId, dateWindow: DATE_WINDOW });
-      const chosen = cands[candIdx];
+      // localizar por firma de grupo para ser estable con/ sin filtro
+      const sig = (g) => g.map(x => x.id).sort().join('|');
+      const chosen = cands.find(c => sig(c.group) === String(candKey));
       if (!chosen) return;
       session.matches = session.matches || {};
       session.matches[bid] = {
@@ -230,7 +232,13 @@ function layout() {
         <ul id="bankList" class="border rounded divide-y max-h-[70vh] overflow-auto"></ul>
       </div>
       <div>
-        <div class="text-sm font-semibold mb-1">Candidatos Alegra (T1→T3)</div>
+        <div class="flex items-center justify-between mb-1">
+          <div class="text-sm font-semibold">Candidatos Alegra (T1→T3)</div>
+          <label class="text-xs flex items-center gap-1">
+            <input id="chkAllCands" type="checkbox" class="accent-blue-600">
+            Ver todos
+          </label>
+        </div>
         <div id="cands" class="border rounded max-h-[70vh] overflow-auto p-2 text-sm"></div>
       </div>
     </div>
@@ -248,6 +256,7 @@ function getRefs(root) {
     badgeBanco: root.querySelector('#badgeBanco'),
     bankList: root.querySelector('#bankList'),
     cands: root.querySelector('#cands'),
+    chkAllCands: root.querySelector('#chkAllCands'),
     panelInfo: root.querySelector('#panelInfo'),
     paramsBanner: root.querySelector('#paramsBanner'),
     chkOnlyPend: root.querySelector('#chkOnlyPend'),
@@ -296,15 +305,19 @@ function renderLeftList(B = [], ui, session) {
 
 function renderRightPanel(b, cands, ui, session, onFix) {
   const fmt = n => 'C$ ' + Number(n).toFixed(2);
-  const pill = t => `<span class="inline-block text-xs px-2 py-0.5 rounded bg-slate-100 border">${t}</span>`;
-  if (!cands.length) {
+  const pill = t => `<span class="inline-block text-[10px] px-1.5 py-0.5 rounded bg-slate-100 border">${t}</span>`;
+
+  const showAll = !!ui?.chkAllCands?.checked;
+  const list = showAll ? cands : cands.filter(c => c.okTol);
+  if (!list.length) {
     ui.cands.innerHTML = `<div class="text-gray-500">Sin candidatos para <b>${b.fecha}</b> ${fmt(b.montoNio)} (signo: ${b.signo})</div>`;
     return;
   }
-  ui.cands.innerHTML = cands.map((c,i) => `
+  const sig = (g) => g.map(x => x.id).sort().join('|');
+  ui.cands.innerHTML = list.map((c) => `
     <div class="p-2 rounded border mb-2 ${c.okTol ? 'border-green-300' : 'border-slate-200'}">
       <div class="flex items-center gap-2 mb-1">
-        ${pill(c.tier)}
+        ${(c.tiers ? Array.from(c.tiers) : [c.tier]).map(pill).join(' ')}
         <span class="text-xs text-gray-600">error ${fmt(c.err)} • lag ${c.lagMax}d • #${c.group.length}</span>
       </div>
       <div class="grid gap-1">
@@ -316,14 +329,18 @@ function renderRightPanel(b, cands, ui, session, onFix) {
       </div>
       <div class="mt-1 text-xs text-gray-700">Σ ${fmt(c.suma)}</div>
       <div class="mt-2 flex gap-2">
-        <button data-cand-idx="${i}" class="px-2 py-1 text-xs bg-blue-600 text-white rounded">Fijar (Enter)</button>
+        <button data-cand-key="${sig(c.group)}" class="px-2 py-1 text-xs bg-blue-600 text-white rounded">Fijar (Enter)</button>
         <button class="px-2 py-1 text-xs bg-slate-100 border rounded">Editar 1↔N</button>
       </div>
     </div>
   `).join('');
   // wire botones Fijar
-  ui.cands.querySelectorAll('[data-cand-idx]').forEach(btn => {
-    btn.onclick = () => onFix(Number(btn.getAttribute('data-cand-idx')));
+  ui.cands.querySelectorAll('[data-cand-key]').forEach(btn => {
+    btn.onclick = () => onFix(btn.getAttribute('data-cand-key'));
   });
+  // re-render al cambiar el toggle
+  if (ui?.chkAllCands) {
+    ui.chkAllCands.onchange = () => renderRightPanel(b, cands, ui, session, onFix);
+  }
 }
 
