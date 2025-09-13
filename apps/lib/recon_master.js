@@ -46,3 +46,78 @@ export async function masterSave({ bankRow, alegraIds, meta = {} }) {
   });
   return sig;
 }
+
+// ====== NUEVO: lecturas/exportaciones/importaciones ======
+
+/** Lee todo el master como arreglo de objetos {sig, ...payload} */
+export async function masterGetAll() {
+  const db = await idbOpen();
+  const store = db.transaction(STORE_MASTER, 'readonly').objectStore(STORE_MASTER);
+  const out = [];
+  await new Promise((res, rej) => {
+    const req = store.openCursor();
+    req.onsuccess = (ev) => {
+      const cur = ev.target.result;
+      if (cur) { out.push({ sig: cur.key, ...cur.value }); cur.continue(); }
+      else res();
+    };
+    req.onerror = () => rej(req.error);
+  });
+  return out;
+}
+
+/** Normaliza una entrada importada a la forma canónica del master */
+function normalizeEntry(raw = {}) {
+  // alegraIds puede venir como string "a|b|c" o arreglo
+  let alegraIds = raw.alegraIds;
+  if (!Array.isArray(alegraIds)) {
+    alegraIds = String(alegraIds ?? '').split(/[|,;\s]+/).filter(Boolean);
+  }
+  const monto = Number(
+    typeof raw.montoNio === 'string' ? raw.montoNio.replace(/,/g,'') : raw.montoNio
+  );
+  const meta = (raw.meta && typeof raw.meta === 'object')
+    ? { ...raw.meta }
+    : (raw.meta ? safeParseJSON(raw.meta) : {});
+  return {
+    sig: raw.sig || null,
+    cuentaId: Number(raw.cuentaId),
+    fecha: raw.fecha,
+    signo: raw.signo,
+    nroConfirm: raw.nroConfirm ?? raw.numeroConfirmacion ?? null,
+    montoNio: Number.isFinite(monto) ? monto.toFixed(2) : '0.00',
+    descripcion: raw.descripcion || '',
+    alegraIds: Array.from(new Set(alegraIds)),
+    meta: { ...meta, ts: meta.ts || Date.now() },
+  };
+}
+function safeParseJSON(s) { try { return JSON.parse(s); } catch { return {}; } }
+
+/**
+ * Importa un lote de entradas normalizadas.
+ * mode='keep' => conserva existentes (no sobreescribe); 'overwrite' => reemplaza.
+ */
+export async function masterImportEntries(entries = [], { mode = 'keep' } = {}) {
+  if (!Array.isArray(entries) || !entries.length) return { inserted: 0, updated: 0, skipped: 0, total: 0 };
+  const db = await idbOpen();
+  const tx = db.transaction(STORE_MASTER, 'readwrite');
+  const store = tx.objectStore(STORE_MASTER);
+  let inserted = 0, updated = 0, skipped = 0;
+  for (const r of entries) {
+    const e = normalizeEntry(r);
+    const sig = e.sig || bankSignature(e);
+    e.sig = sig;
+    // ¿existe ya?
+    // Nota: usamos await secuencial para mantener viva la transacción con orden predecible
+    const exists = await new Promise((res) => {
+      const g = store.get(sig); g.onsuccess = () => res(!!g.result); g.onerror = () => res(false);
+    });
+    if (exists && mode === 'keep') { skipped++; continue; }
+    await new Promise((res, rej) => {
+      const p = store.put(e, sig); p.onsuccess = () => res(); p.onerror = () => rej(p.error);
+    });
+    exists ? updated++ : inserted++;
+  }
+  await new Promise((res) => { tx.oncomplete = () => res(); });
+  return { inserted, updated, skipped, total: entries.length };
+}
