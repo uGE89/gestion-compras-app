@@ -4,6 +4,7 @@ import { normalizeAndFilterAlegra, normalizeBanco } from './lib/recon_parser.js'
 import { buildIndexes, candidatesForBankRow } from './lib/recon_matcher.js';
 import { DATE_WINDOW } from './lib/recon_config.js';
 import { loadSession, saveSession } from './lib/recon_storage.js';
+import { clearCache } from './lib/mapping_cache.js'; // opcional si usás asociaciones aquí después
 
 export default {
   title: 'Conciliación Alegra ↔ Bancos',
@@ -18,6 +19,8 @@ export default {
     let B = [];                  // Banco normalizado
     let idx = null;              // índices de Alegra
     let periodo = { desde: null, hasta: null };
+    let session = { matches: {}, onlyPend: false }; // { [bankId]: { alegraIds:[], tier, suma, err } }
+    let activeBid = null;
 
     // Cargar librerías
     await ensureCDNs();
@@ -48,6 +51,8 @@ export default {
     });
 
     ui.btnProcesar.addEventListener('click', () => {
+      // opcional: clear cache de asociaciones si tu flujo lo usa
+      try { clearCache(); } catch {}
       const cuentaId = Number(ui.cuenta.value);
       const tc = Number(ui.tc.value || '1');
       // Normaliza y filtra Alegra (solo conciliables y SOLO cuenta seleccionada)
@@ -57,7 +62,9 @@ export default {
       B = Bpack.rows; periodo = { desde: Bpack.desde, hasta: Bpack.hasta };
 
       idx = buildIndexes(A);
-      renderLeftList(B, ui);
+      // Restaurar sesión
+      session = loadSession({ cuentaId, desdeISO: periodo.desde, hastaISO: periodo.hasta }) || { matches: {}, onlyPend: false };
+      renderLeftList(B, ui, session);
       ui.panelInfo.textContent = `Alegra (filtrada): ${A.length} • Banco: ${B.length} • Periodo ${periodo.desde || '?'} a ${periodo.hasta || '?'}`;
       ui.paramsBanner.classList.add('hidden');
     });
@@ -81,15 +88,27 @@ export default {
         list.forEach(x => x.classList.remove('ring-2','ring-blue-500'));
         list[next].classList.add('ring-2','ring-blue-500');
         selectBankRow(list[next].dataset.bid);
+      } else if (ev.key === 'Enter' && activeBid) {
+        // Fijar el mejor candidato visible
+        const node = container.querySelector('#cands [data-cand-idx]');
+        if (node) {
+          const i = Number(node.getAttribute('data-cand-idx')); // primer cand
+          fixCandidate(activeBid, i);
+        }
+      } else if (ev.key === 'j' || ev.key === 'k') {
+        const dir = ev.key === 'j' ? 'ArrowDown' : 'ArrowUp';
+        const e = new KeyboardEvent('keydown', { key: dir });
+        container.dispatchEvent(e);
       }
     });
 
     function selectBankRow(bid) {
       const b = B.find(x => x.id === bid);
       if (!b || !idx) return;
+      activeBid = bid;
       const cuentaId = Number(ui.cuenta.value);
       const cands = candidatesForBankRow(b, idx, { cuentaId, dateWindow: DATE_WINDOW });
-      renderRightPanel(b, cands, ui);
+      renderRightPanel(b, cands, ui, session, (candIdx) => fixCandidate(bid, candIdx));
       // marca selección visual
       container.querySelectorAll('[data-bid]').forEach(x => x.classList.remove('bg-blue-50'));
       const node = container.querySelector(`[data-bid="${bid}"]`);
@@ -98,6 +117,25 @@ export default {
 
     function maybeEnableProcess() {
       ui.btnProcesar.disabled = !(alegraRows.length && bancoRows.length && ui.cuenta.value);
+    }
+
+    function fixCandidate(bid, candIdx = 0) {
+      const b = B.find(x => x.id === bid);
+      if (!b) return;
+      const cuentaId = Number(ui.cuenta.value);
+      const cands = candidatesForBankRow(b, idx, { cuentaId, dateWindow: DATE_WINDOW });
+      const chosen = cands[candIdx];
+      if (!chosen) return;
+      session.matches[bid] = {
+        alegraIds: chosen.group.map(a => a.id),
+        tier: chosen.tier,
+        suma: chosen.suma,
+        err: chosen.err
+      };
+      saveSession({ cuentaId, desdeISO: periodo.desde, hastaISO: periodo.hasta }, session);
+      // refrescar UI izquierda y derecha
+      renderLeftList(B, ui, session);
+      selectBankRow(bid);
     }
   }
 };
@@ -138,6 +176,13 @@ function layout() {
     <div id="paramsBanner" class="hidden bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded">Parámetros cambiaron. <button class="underline">Recalcular</button></div>
     <div id="panelInfo" class="text-sm text-gray-600">—</div>
 
+    <div class="flex items-center gap-3">
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input id="chkOnlyPend" type="checkbox" class="accent-blue-600">
+        Mostrar solo pendientes
+      </label>
+    </div>
+
     <div class="grid grid-cols-2 gap-3">
       <div>
         <div class="text-sm font-semibold mb-1">Banco (160/mes aprox.)</div>
@@ -164,6 +209,7 @@ function getRefs(root) {
     cands: root.querySelector('#cands'),
     panelInfo: root.querySelector('#panelInfo'),
     paramsBanner: root.querySelector('#paramsBanner'),
+    chkOnlyPend: root.querySelector('#chkOnlyPend'),
   };
 }
 
@@ -172,20 +218,34 @@ function dirtyParamsBanner(ui) {
   ui.paramsBanner.querySelector('button').onclick = () => ui.btnProcesar.click();
 }
 
-function renderLeftList(B, ui) {
+function renderLeftList(B, ui, session={matches:{}, onlyPend:false}) {
   const fmt = n => (n<0?'-':'') + 'C$ ' + Math.abs(n).toFixed(2);
-  ui.bankList.innerHTML = B.map(b => `
-    <li data-bid="${b.id}" class="px-3 py-2 hover:bg-blue-50 cursor-pointer">
-      <div class="flex justify-between">
-        <div class="font-medium">${b.fecha} • ${b.nroConfirm || '—'}</div>
-        <div class="${b.montoNio>=0?'text-green-700':'text-red-700'}">${fmt(b.montoNio)}</div>
-      </div>
-      <div class="text-xs text-gray-600">${b.descripcion || ''}</div>
-    </li>
-  `).join('');
+  const rows = session.onlyPend ? B.filter(b => !session.matches[b.id]) : B;
+  ui.bankList.innerHTML = rows.map(b => {
+    const ok = !!session.matches[b.id];
+    const dot = ok ? 'bg-green-500' : 'bg-amber-400';
+    return `
+      <li data-bid="${b.id}" class="px-3 py-2 hover:bg-blue-50 cursor-pointer">
+        <div class="flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full ${dot}"></span>
+            <div class="font-medium">${b.fecha} • ${b.nroConfirm || '—'}</div>
+          </div>
+          <div class="${b.montoNio>=0?'text-green-700':'text-red-700'}">${fmt(b.montoNio)}</div>
+        </div>
+        <div class="text-xs text-gray-600">${b.descripcion || ''}</div>
+      </li>`;
+  }).join('');
+  if (ui.chkOnlyPend) {
+    ui.chkOnlyPend.onchange = () => {
+      session.onlyPend = ui.chkOnlyPend.checked;
+      renderLeftList(B, ui, session);
+    };
+    ui.chkOnlyPend.checked = !!session.onlyPend;
+  }
 }
 
-function renderRightPanel(b, cands, ui) {
+function renderRightPanel(b, cands, ui, session, onFix) {
   const fmt = n => 'C$ ' + Number(n).toFixed(2);
   const pill = t => `<span class="inline-block text-xs px-2 py-0.5 rounded bg-slate-100 border">${t}</span>`;
   if (!cands.length) {
@@ -207,10 +267,14 @@ function renderRightPanel(b, cands, ui) {
       </div>
       <div class="mt-1 text-xs text-gray-700">Σ ${fmt(c.suma)}</div>
       <div class="mt-2 flex gap-2">
-        <button class="px-2 py-1 text-xs bg-blue-600 text-white rounded">Fijar (Enter)</button>
+        <button data-cand-idx="${i}" class="px-2 py-1 text-xs bg-blue-600 text-white rounded">Fijar (Enter)</button>
         <button class="px-2 py-1 text-xs bg-slate-100 border rounded">Editar 1↔N</button>
       </div>
     </div>
   `).join('');
+  // wire botones Fijar
+  ui.cands.querySelectorAll('[data-cand-idx]').forEach(btn => {
+    btn.onclick = () => onFix(Number(btn.getAttribute('data-cand-idx')));
+  });
 }
 
