@@ -81,15 +81,15 @@ export default {
       const cuentaId = Number(ui.cuenta.value);
       const tc = Number(ui.tc.value || '1');
 
-      // 1) Autodetectar fuentes y corregir si el usuario las cruzó
+      // --- Autodetección y swap si el usuario cruzó los archivos
       try {
         const tA = detectSourceType(alegraRows);
         const tB = detectSourceType(bancoRows);
         if (tA === 'banco' && tB === 'alegra') {
-          const tmp = alegraRows; alegraRows = bancoRows; bancoRows = tmp;
-          console.warn('Archivos cruzados: intercambiados A↔B automáticamente');
+          [alegraRows, bancoRows] = [bancoRows, alegraRows];
+          console.warn('Archivos cruzados detectados: A↔B intercambiados automáticamente');
         }
-      } catch (e) { console.warn('No se pudo detectar tipo de fuente', e); }
+      } catch (e) { console.warn('detectSourceType falló o no concluyente', e); }
 
       // 2) Normalización y filtrado
       // Normaliza y filtra Alegra (solo conciliables y SOLO cuenta seleccionada)
@@ -129,11 +129,11 @@ export default {
         list[next].classList.add('ring-2','ring-blue-500');
         selectBankRow(list[next].dataset.bid);
       } else if (ev.key === 'Enter' && activeBid) {
-        // Fijar el mejor candidato visible
+        // Fijar el primer candidato visible (por firma del grupo)
         const node = container.querySelector('#cands [data-cand-key]');
         if (node) {
-          const k = node.getAttribute('data-cand-key'); // primer cand
-          fixCandidate(activeBid, k);
+          const key = node.getAttribute('data-cand-key');
+          fixCandidate(activeBid, key);
         }
       } else if (ev.key === 'j' || ev.key === 'k') {
         const dir = ev.key === 'j' ? 'ArrowDown' : 'ArrowUp';
@@ -166,7 +166,7 @@ export default {
       const cands = candidatesForBankRow(b, idx, { cuentaId, dateWindow: DATE_WINDOW });
       // localizar por firma de grupo para ser estable con/ sin filtro
       const sig = (g) => g.map(x => x.id).sort().join('|');
-      const chosen = cands.find(c => sig(c.group) === String(candKey));
+      const chosen = cands.find(c => sig(c.group) === String(candKey)) || cands[0];
       if (!chosen) return;
       session.matches = session.matches || {};
       session.matches[bid] = {
