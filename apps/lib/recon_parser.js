@@ -21,8 +21,10 @@ export function normalizeAndFilterAlegra(rowsAlegra, cuentasArray, selectedCuent
     if (selectedCuentaId && cuentaId !== Number(selectedCuentaId)) continue; // solo la cuenta elegida
 
     const tipo = (r['tipo'] || '').toString().toLowerCase();
-    const signo = tipo.includes('ingreso') ? 'in' : (tipo.includes('egreso') ? 'out' : null);
-
+    // cubrir variantes comunes
+    let signo = null;
+    if (/(ingreso|entrada|\bin\b)/.test(tipo)) signo = 'in';
+    else if (/(egreso|salida|\bout\b)/.test(tipo)) signo = 'out';
     out.push({
       id: String(r['numero'] ?? '').trim() || cryptoId('A'), // no se usa para T1
       cuentaId,
@@ -73,7 +75,7 @@ export function normalizeBanco(rowsBanco, { cuentaId, tipoCambio=1 }) {
 
 // Extrae tokens numéricos >=6 dígitos desde un texto
 export function extractNumTokens6(text) {
-  const s = (text || '').toString();
+  const s = (text || '').toString().replace(/[\s-]/g, '');
   const tokens = new Set();
   const re = /(\d{6,})/g;
   let m; while ((m = re.exec(s))) tokens.add(m[1]);
