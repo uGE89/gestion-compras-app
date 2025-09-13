@@ -3,6 +3,7 @@ import { ensureCDNs, readAnyTable, detectSourceType } from './lib/recon_utils.js
 import { normalizeAndFilterAlegra, normalizeBanco } from './lib/recon_parser.js';
 import { buildIndexes, candidatesForBankRow } from './lib/recon_matcher.js';
 import { DATE_WINDOW } from './lib/recon_config.js';
+import { bankSignature, masterBulkHas, masterSave } from './lib/recon_master.js';
 import { loadSession, saveSession, saveParsedTables, loadParsedTables, savePrefs, loadPrefs } from './lib/recon_storage.js';
 import { clearCache } from './lib/mapping_cache.js'; // opcional si usás asociaciones aquí después
 
@@ -110,6 +111,11 @@ export default {
       session = normalizeSession(
         loadSession({ cuentaId, desdeISO: periodo.desde, hastaISO: periodo.hasta }) || {}
       );
+
+      // Marcar conciliados ya guardados en MASTER
+      const sigs = B.map(b => bankSignature(b));
+      const hasMap = await masterBulkHas(sigs);
+      B = B.map((b, i) => ({ ...b, inMaster: !!hasMap.get(sigs[i]), _sig: sigs[i] }));
       renderLeftList(B, ui, session);
       ui.panelInfo.textContent = `Alegra (filtrada): ${A.length} • Banco: ${B.length} • Periodo ${periodo.desde || '?'} a ${periodo.hasta || '?'}`;
       ui.paramsBanner.classList.add('hidden');
@@ -171,7 +177,7 @@ export default {
       ui.btnProcesar.disabled = !(alegraRows.length && bancoRows.length && ui.cuenta.value);
     }
 
-    function fixCandidate(bid, candKey) {
+    async function fixCandidate(bid, candKey) {
       const b = B.find(x => x.id === bid);
       if (!b) return;
       const cuentaId = Number(ui.cuenta.value);
@@ -188,6 +194,17 @@ export default {
         err: chosen.err
       };
       saveSession({ cuentaId, desdeISO: periodo.desde, hastaISO: periodo.hasta }, normalizeSession(session));
+
+      // Guardar en MASTER (DB separada)
+      try {
+        await masterSave({
+          bankRow: b,
+          alegraIds: chosen.group.map(a => a.id),
+          meta: { tiers: chosen.tiers ? Array.from(chosen.tiers) : [chosen.tier], suma: chosen.suma, err: chosen.err }
+        });
+        b.inMaster = true;
+      } catch (e) { console.warn('masterSave error', e); }
+
       // refrescar UI izquierda y derecha
       renderLeftList(B, ui, session);
       selectBankRow(bid);
@@ -236,6 +253,10 @@ function layout() {
         <input id="chkOnlyPend" type="checkbox" class="accent-blue-600">
         Mostrar solo pendientes
       </label>
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input id="chkHideMaster" type="checkbox" class="accent-blue-600" checked>
+        Excluir conciliados (master)
+      </label>
     </div>
 
     <div class="grid grid-cols-2 gap-3">
@@ -272,6 +293,7 @@ function getRefs(root) {
     panelInfo: root.querySelector('#panelInfo'),
     paramsBanner: root.querySelector('#paramsBanner'),
     chkOnlyPend: root.querySelector('#chkOnlyPend'),
+    chkHideMaster: root.querySelector('#chkHideMaster'),
   };
 }
 
@@ -283,10 +305,11 @@ function dirtyParamsBanner(ui) {
 function renderLeftList(B = [], ui, session) {
   session = normalizeSession(session || {});
   const fmt = n => (n<0?'-':'') + 'C$ ' + Math.abs(n).toFixed(2);
-  const rows = session.onlyPend ? B.filter(b => !session.matches[b.id]) : B;
+  let rows = session.onlyPend ? B.filter(b => !session.matches[b.id]) : B.slice();
+  if (ui?.chkHideMaster?.checked) rows = rows.filter(b => !b.inMaster);
   ui.bankList.innerHTML = rows.map(b => {
     const ok = !!session.matches[b.id];
-    const dot = ok ? 'bg-green-500' : 'bg-amber-400';
+    const dot = b.inMaster ? 'bg-gray-400' : (ok ? 'bg-green-500' : 'bg-amber-400');
     return `
       <li data-bid="${b.id}" class="px-3 py-2 hover:bg-blue-50 cursor-pointer">
         <div class="flex justify-between items-center">
@@ -313,6 +336,7 @@ function renderLeftList(B = [], ui, session) {
     };
     ui.chkOnlyPend.checked = !!session.onlyPend;
   }
+  if (ui.chkHideMaster) ui.chkHideMaster.onchange = () => renderLeftList(B, ui, session);
 }
 
 function renderRightPanel(b, cands, ui, session, onFix) {
