@@ -6,6 +6,13 @@ import { DATE_WINDOW } from './lib/recon_config.js';
 import { loadSession, saveSession } from './lib/recon_storage.js';
 import { clearCache } from './lib/mapping_cache.js'; // opcional si usás asociaciones aquí después
 
+function normalizeSession(s) {
+  return {
+    matches: (s && s.matches) ? s.matches : {},
+    onlyPend: !!(s && s.onlyPend),
+  };
+}
+
 export default {
   title: 'Conciliación Alegra ↔ Bancos',
   async mount(container, { appState, params }) {
@@ -19,7 +26,7 @@ export default {
     let B = [];                  // Banco normalizado
     let idx = null;              // índices de Alegra
     let periodo = { desde: null, hasta: null };
-    let session = { matches: {}, onlyPend: false }; // { [bankId]: { alegraIds:[], tier, suma, err } }
+    let session = normalizeSession({}); // { [bankId]: { alegraIds:[], tier, suma, err } }
     let activeBid = null;
 
     // Cargar librerías
@@ -63,7 +70,9 @@ export default {
 
       idx = buildIndexes(A);
       // Restaurar sesión
-      session = loadSession({ cuentaId, desdeISO: periodo.desde, hastaISO: periodo.hasta }) || { matches: {}, onlyPend: false };
+      session = normalizeSession(
+        loadSession({ cuentaId, desdeISO: periodo.desde, hastaISO: periodo.hasta }) || {}
+      );
       renderLeftList(B, ui, session);
       ui.panelInfo.textContent = `Alegra (filtrada): ${A.length} • Banco: ${B.length} • Periodo ${periodo.desde || '?'} a ${periodo.hasta || '?'}`;
       ui.paramsBanner.classList.add('hidden');
@@ -126,13 +135,14 @@ export default {
       const cands = candidatesForBankRow(b, idx, { cuentaId, dateWindow: DATE_WINDOW });
       const chosen = cands[candIdx];
       if (!chosen) return;
+      session.matches = session.matches || {};
       session.matches[bid] = {
         alegraIds: chosen.group.map(a => a.id),
         tier: chosen.tier,
         suma: chosen.suma,
         err: chosen.err
       };
-      saveSession({ cuentaId, desdeISO: periodo.desde, hastaISO: periodo.hasta }, session);
+      saveSession({ cuentaId, desdeISO: periodo.desde, hastaISO: periodo.hasta }, normalizeSession(session));
       // refrescar UI izquierda y derecha
       renderLeftList(B, ui, session);
       selectBankRow(bid);
@@ -218,7 +228,8 @@ function dirtyParamsBanner(ui) {
   ui.paramsBanner.querySelector('button').onclick = () => ui.btnProcesar.click();
 }
 
-function renderLeftList(B, ui, session={matches:{}, onlyPend:false}) {
+function renderLeftList(B = [], ui, session) {
+  session = normalizeSession(session || {});
   const fmt = n => (n<0?'-':'') + 'C$ ' + Math.abs(n).toFixed(2);
   const rows = session.onlyPend ? B.filter(b => !session.matches[b.id]) : B;
   ui.bankList.innerHTML = rows.map(b => {
