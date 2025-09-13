@@ -15,21 +15,21 @@ export function normalizeAndFilterAlegra(rowsAlegra, cuentasArray, selectedCuent
   const { getIdByName } = buildAccountNameToIdMap(cuentasArray);
   const out = [];
   for (const r of rowsAlegra || []) {
-    const cuentaId = getIdByName(r['Cuenta']);
+    const cuentaId = getIdByName(r['cuenta']);
     if (!cuentaId) continue;
     if (!CONCILIABLE_ACCOUNT_IDS.has(cuentaId)) continue; // solo conciliables
     if (selectedCuentaId && cuentaId !== Number(selectedCuentaId)) continue; // solo la cuenta elegida
 
-    const tipo = (r['Tipo'] || '').toString().toLowerCase();
+    const tipo = (r['tipo'] || '').toString().toLowerCase();
     const signo = tipo.includes('ingreso') ? 'in' : (tipo.includes('egreso') ? 'out' : null);
 
     out.push({
-      id: String(r['Número'] ?? '').trim() || cryptoId('A'), // no se usa para T1
+      id: String(r['numero'] ?? '').trim() || cryptoId('A'), // no se usa para T1
       cuentaId,
-      fecha: toISODate(r['Fecha']),
-      notas: (r['Notas'] || '').toString(),       // T1: Banco.NumConfirm ↔ Alegra.Notas
-      observaciones: (r['Observaciones'] || '').toString(), // T2: tokens >=6 dígitos
-      valorNio: parseNumberUS(r['Valor En NIO']),
+      fecha: toISODate(r['fecha']),
+      notas: (r['notas'] || '').toString(),       // T1: Banco.NumConfirm ↔ Alegra.Notas
+      observaciones: (r['observaciones'] || '').toString(), // T2: tokens >=6 dígitos
+      valorNio: parseNumberUS(r['valor en nio']),
       signo, // 'in'|'out'|null
       raw: r,
     });
@@ -42,12 +42,12 @@ export function normalizeBanco(rowsBanco, { cuentaId, tipoCambio=1 }) {
   const out = [];
   let minDate = null, maxDate = null;
   for (const r of rowsBanco || []) {
-    const fecha = toISODate(r['Fecha']);
+    const fecha = toISODate(r['fecha']);
     if (!fecha) continue;
-    const confirm = (r['Número de confirmación'] || r['Numero de confirmacion'] || r['NroConfirmacion'] || '').toString().trim();
-    const descripcion = (r['Descripción'] || r['Descripcion'] || '').toString();
-    const deb = parseNumberUS(r['Débito'] || r['Debito']);
-    const cred = parseNumberUS(r['Crédito'] || r['Credito']);
+    const confirm = (r['numero de confirmacion'] || r['nroconfirmacion'] || '').toString().trim();
+    const descripcion = (r['descripcion'] || '').toString();
+    const deb = parseNumberUS(r['debito']);
+    const cred = parseNumberUS(r['credito']);
 
     // Signo Banco: Crédito=in, Débito=out
     const signo = cred > 0 ? 'in' : (deb > 0 ? 'out' : null);
