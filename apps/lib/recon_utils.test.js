@@ -36,6 +36,23 @@ test('detects header with mixed accents and case', () => {
   ]);
 });
 
+test('detects header with debito/credito without confirmation number', () => {
+  const matrix = [
+    ['foo', 'bar'],
+    ['Fecha', 'Débito', 'Crédito', 'Referencia'],
+    ['2024-03-04', '0', '100', 'ABC'],
+  ];
+  const rows = autoHeaderObjects(matrix);
+  assert.deepEqual(rows, [
+    {
+      fecha: '2024-03-04',
+      debito: '0',
+      credito: '100',
+      referencia: 'ABC',
+    },
+  ]);
+});
+
 test('detectSourceType identifies sources and handles conflicts', () => {
   const alegra = [{ Cuenta: 'Caja', 'Valor en NIO': '10' }];
   const banco = [{ Debito: '5', Credito: '0', Referencia: 'abc' }];

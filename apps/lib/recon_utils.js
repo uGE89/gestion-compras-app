@@ -206,7 +206,10 @@ export function autoHeaderObjects(matrixOrRows) {
     const hasConfirm = cells.some(c => c.includes('numero de confirmacion') || c.includes('nroconfirmacion'));
     const hasCuenta = cells.some(c => c === 'cuenta');
     const hasValorNIO = cells.some(c => c === 'valor en nio');
-    return hasFecha && (hasConfirm || (hasCuenta && hasValorNIO));
+    const hasDebCred = cells.some(c => c === 'debito' || c === 'credito');
+    const hasMonto   = cells.some(c => c === 'monto' || c === 'importe' || c === 'valor');
+    // Aceptar encabezado banco si trae fecha y (confirmación) o (débito/crédito) o (monto)
+    return hasFecha && (hasConfirm || (hasCuenta && hasValorNIO) || hasDebCred || hasMonto);
   };
   const hIdx = M.findIndex(isHeaderRow);
   const extractHeader = (arr = []) => {
