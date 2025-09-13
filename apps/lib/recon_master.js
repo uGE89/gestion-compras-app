@@ -96,28 +96,76 @@ function safeParseJSON(s) { try { return JSON.parse(s); } catch { return {}; } }
 /**
  * Importa un lote de entradas normalizadas.
  * mode='keep' => conserva existentes (no sobreescribe); 'overwrite' => reemplaza.
+ * Se procesan en lotes para evitar tiempos de espera largos y se permite
+ * reportar progreso mediante un callback.
  */
-export async function masterImportEntries(entries = [], { mode = 'keep' } = {}) {
-  if (!Array.isArray(entries) || !entries.length) return { inserted: 0, updated: 0, skipped: 0, total: 0 };
+export async function masterImportEntries(
+  entries = [],
+  { mode = 'keep', chunkSize = 100, onProgress } = {}
+) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return { inserted: 0, updated: 0, skipped: 0, total: 0 };
+  }
+
   const db = await idbOpen();
   const tx = db.transaction(STORE_MASTER, 'readwrite');
   const store = tx.objectStore(STORE_MASTER);
+
   let inserted = 0, updated = 0, skipped = 0;
-  for (const r of entries) {
-    const e = normalizeEntry(r);
-    const sig = e.sig || bankSignature(e);
-    e.sig = sig;
-    // ¿existe ya?
-    // Nota: usamos await secuencial para mantener viva la transacción con orden predecible
-    const exists = await new Promise((res) => {
-      const g = store.get(sig); g.onsuccess = () => res(!!g.result); g.onerror = () => res(false);
+  const total = entries.length;
+  let processed = 0;
+
+  for (let i = 0; i < entries.length; i += chunkSize) {
+    const slice = entries.slice(i, i + chunkSize);
+
+    // Normalizar y obtener firmas
+    const normalized = slice.map((r) => {
+      const e = normalizeEntry(r);
+      const sig = e.sig || bankSignature(e);
+      e.sig = sig;
+      return e;
     });
-    if (exists && mode === 'keep') { skipped++; continue; }
-    await new Promise((res, rej) => {
-      const p = store.put(e, sig); p.onsuccess = () => res(); p.onerror = () => rej(p.error);
+
+    // Verificar existencia en paralelo
+    const existFlags = await Promise.all(
+      normalized.map(
+        (e) =>
+          new Promise((res) => {
+            const g = store.get(e.sig);
+            g.onsuccess = () => res(!!g.result);
+            g.onerror = () => res(false);
+          })
+      )
+    );
+
+    // Insertar/actualizar en paralelo
+    const putPromises = [];
+    normalized.forEach((e, idx) => {
+      const exists = existFlags[idx];
+      if (exists && mode === 'keep') {
+        skipped++;
+        return;
+      }
+      putPromises.push(
+        new Promise((res, rej) => {
+          const p = store.put(e, e.sig);
+          p.onsuccess = () => res();
+          p.onerror = () => rej(p.error);
+        })
+      );
+      exists ? updated++ : inserted++;
     });
-    exists ? updated++ : inserted++;
+
+    await Promise.all(putPromises);
+
+    processed += slice.length;
+    if (typeof onProgress === 'function') {
+      try { await onProgress({ processed, total }); } catch { /* ignore */ }
+    }
   }
-  await new Promise((res) => { tx.oncomplete = () => res(); });
-  return { inserted, updated, skipped, total: entries.length };
+
+  await new Promise((res) => {
+    tx.oncomplete = () => res();
+  });
+  return { inserted, updated, skipped, total };
 }
