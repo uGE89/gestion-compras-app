@@ -1,5 +1,5 @@
 // apps/conciliacion.app.js
-import { ensureCDNs, readAnyTable } from './lib/recon_utils.js';
+import { ensureCDNs, readAnyTable, detectSourceType } from './lib/recon_utils.js';
 import { normalizeAndFilterAlegra, normalizeBanco } from './lib/recon_parser.js';
 import { buildIndexes, candidatesForBankRow } from './lib/recon_matcher.js';
 import { DATE_WINDOW } from './lib/recon_config.js';
@@ -62,6 +62,18 @@ export default {
       try { clearCache(); } catch {}
       const cuentaId = Number(ui.cuenta.value);
       const tc = Number(ui.tc.value || '1');
+
+      // 1) Autodetectar fuentes y corregir si el usuario las cruzó
+      try {
+        const tA = detectSourceType(alegraRows);
+        const tB = detectSourceType(bancoRows);
+        if (tA === 'banco' && tB === 'alegra') {
+          const tmp = alegraRows; alegraRows = bancoRows; bancoRows = tmp;
+          console.warn('Archivos cruzados: intercambiados A↔B automáticamente');
+        }
+      } catch (e) { console.warn('No se pudo detectar tipo de fuente', e); }
+
+      // 2) Normalización y filtrado
       // Normaliza y filtra Alegra (solo conciliables y SOLO cuenta seleccionada)
       A = normalizeAndFilterAlegra(alegraRows, cuentasArray, cuentaId);
       // Normaliza Banco con TC global

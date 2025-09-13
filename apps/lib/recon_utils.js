@@ -35,6 +35,26 @@ export function normalizeText(str) {
     .replace(/\s+/g, ' ');
 }
 
+// === Heurística simple para saber si un rows parece de Alegra o de Banco
+export function detectSourceType(rows = []) {
+  if (!Array.isArray(rows) || !rows.length) return 'unknown';
+  const keys = Object.keys(rows[0] || {}).map(k => normalizeText(k));
+  const has = (k) => keys.includes(k);
+
+  const looksAlegra =
+    (has('cuenta') && (has('valor en nio') || has('valor'))) || has('notas');
+
+  const looksBanco =
+    has('debito') || has('d\u00e9bito') || has('credito') || has('cr\u00e9dito') ||
+    has('monto') || has('importe') || has('valor') ||
+    has('numero de confirmacion') || has('nroconfirmacion') ||
+    has('referencia') || has('numero de referencia');
+
+  if (looksAlegra && !looksBanco) return 'alegra';
+  if (looksBanco && !looksAlegra) return 'banco';
+  return looksAlegra ? 'alegra' : (looksBanco ? 'banco' : 'unknown');
+}
+
 // ===== Fechas a ISO (YYYY-MM-DD) =====
 export function toISODate(any) {
   if (!any) return null;
