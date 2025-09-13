@@ -117,35 +117,73 @@ function safeParseJSON(s) { try { return JSON.parse(s); } catch { return {}; } }
 /**
  * Importa un lote de entradas normalizadas.
  * mode='keep' => conserva existentes (no sobreescribe); 'overwrite' => reemplaza.
+ * Permite procesamiento por lotes y callback de progreso para lotes grandes.
  */
-export async function masterImportEntries(entries = [], { mode = 'keep' } = {}) {
-  if (!Array.isArray(entries) || !entries.length) return { inserted: 0, updated: 0, skipped: 0, total: 0, errors: [] };
+export async function masterImportEntries(
+  entries = [],
+  { mode = 'keep', chunkSize = 100, onProgress } = {}
+) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return { inserted: 0, updated: 0, skipped: 0, total: 0, errors: [] };
+  }
   const db = await idbOpen();
   const tx = db.transaction(STORE_MASTER, 'readwrite');
   const store = tx.objectStore(STORE_MASTER);
   let inserted = 0, updated = 0, skipped = 0;
   const errors = [];
-  for (const r of entries) {
-    const { value: e, errors: errs } = normalizeEntry(r);
-    if (errs?.length) {
-      console.warn('Skipping invalid master entry', errs, r);
-      errors.push({ entry: r, errors: errs });
-      skipped++;
-      continue;
+  const total = entries.length;
+
+  for (let i = 0; i < total; i += chunkSize) {
+    const chunk = entries.slice(i, i + chunkSize);
+    const tasks = chunk.map((r) => {
+      const { value: e, errors: errs } = normalizeEntry(r);
+      if (errs?.length) {
+        console.warn('Skipping invalid master entry', errs, r);
+        errors.push({ entry: r, errors: errs });
+        skipped++;
+        return Promise.resolve();
+      }
+      const sig = e.sig || bankSignature(e);
+      e.sig = sig;
+      return new Promise((resolve) => {
+        const g = store.get(sig);
+        g.onsuccess = () => {
+          const exists = !!g.result;
+          if (exists && mode === 'keep') {
+            skipped++;
+            resolve();
+            return;
+          }
+          const p = store.put(e, sig);
+          p.onsuccess = () => {
+            exists ? updated++ : inserted++;
+            resolve();
+          };
+          p.onerror = () => {
+            errors.push({ entry: r, errors: [p.error?.message || 'put error'] });
+            skipped++;
+            resolve();
+          };
+        };
+        g.onerror = () => {
+          errors.push({ entry: r, errors: [g.error?.message || 'get error'] });
+          skipped++;
+          resolve();
+        };
+      });
+    });
+    await Promise.all(tasks);
+    if (typeof onProgress === 'function') {
+      const processed = Math.min(i + chunk.length, total);
+      try { onProgress({ processed, total, inserted, updated, skipped }); } catch {}
     }
-    const sig = e.sig || bankSignature(e);
-    e.sig = sig;
-    // ¿existe ya?
-    // Nota: usamos await secuencial para mantener viva la transacción con orden predecible
-    const exists = await new Promise((res) => {
-      const g = store.get(sig); g.onsuccess = () => res(!!g.result); g.onerror = () => res(false);
-    });
-    if (exists && mode === 'keep') { skipped++; continue; }
-    await new Promise((res, rej) => {
-      const p = store.put(e, sig); p.onsuccess = () => res(); p.onerror = () => rej(p.error);
-    });
-    exists ? updated++ : inserted++;
   }
-  await new Promise((res) => { tx.oncomplete = () => res(); });
-  return { inserted, updated, skipped, total: entries.length, errors };
+
+  await new Promise((res, rej) => {
+    tx.oncomplete = () => res();
+    tx.onerror = () => rej(tx.error);
+    tx.onabort = () => rej(tx.error);
+  });
+
+  return { inserted, updated, skipped, total, errors };
 }

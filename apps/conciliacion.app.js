@@ -146,10 +146,13 @@ export default {
       try {
         const text = await f.text();
         let result = { inserted: 0, updated: 0, skipped: 0, total: 0 };
+        const onProgress = ({ processed, total }) => {
+          ui.masterStatus.textContent = `Importando ${processed}/${total}...`;
+        };
         if (/\.(json)$/i.test(f.name)) {
           const data = JSON.parse(text);
           const entries = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
-          result = await masterImportEntries(entries, { mode: 'keep' });
+          result = await masterImportEntries(entries, { mode: 'keep', onProgress });
         } else {
           await ensureCDNs(); // PapaParse
           const parsed = window.Papa.parse(text, { header: true, skipEmptyLines: true });
@@ -166,7 +169,7 @@ export default {
             alegraIds: r.alegraIds,          // puede venir "a|b|c"
             meta: r.meta                     // puede venir como JSON string
           }));
-          result = await masterImportEntries(entries, { mode: 'keep' });
+          result = await masterImportEntries(entries, { mode: 'keep', onProgress });
         }
         ui.masterStatus.textContent = `Importados: ${result.inserted}, actualizados: ${result.updated}, omitidos: ${result.skipped}`;
         // refrescar banderas inMaster si ya hay B
