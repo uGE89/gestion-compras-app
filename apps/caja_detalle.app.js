@@ -4,6 +4,98 @@ import {
   doc, getDoc, updateDoc, serverTimestamp, deleteDoc
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+function setupA4PrintStyles() {
+  if (document.getElementById('print-a4-style')) return;
+  const style = document.createElement('style');
+  style.id = 'print-a4-style';
+  style.textContent = `
+  /* === Print A4: una sola página, solo detalle === */
+  @media print {
+    @page {
+      size: A4 portrait;
+      margin: 12mm; /* márgenes solicitados */
+    }
+
+    /* Oculta TODO excepto el detalle */
+    body * {
+      visibility: hidden !important;
+    }
+    .printable-area, .printable-area * {
+      visibility: visible !important;
+    }
+
+    /* Asegura que el detalle se ubique en la página dentro de los márgenes */
+    .printable-area {
+      position: static !important;
+      box-shadow: none !important;
+      border: none !important;
+      background: #fff !important;
+      /* El ancho útil de A4 con 12mm de margen por lado ≈ 186mm */
+      width: 186mm !important;
+      /* Evita que se corte en múltiples páginas */
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    /* Contenedor general del detalle (si usas uno) */
+    .printable-area .p-4, 
+    .printable-area .p-6, 
+    .printable-area .md\:p-6, 
+    .printable-area .md\:p-4 {
+      padding: 0 !important; /* elimina rellenos que roban espacio en impresión */
+    }
+
+    /* Encabezados / tipografías más compactos para que quepa */
+    .printable-area h1, .printable-area h2, .printable-area h3 {
+      margin: 0 0 6px 0 !important;
+      line-height: 1.15 !important;
+    }
+    .printable-area { 
+      font-size: 12px !important;  /* compáctalo un poco */
+      line-height: 1.25 !important;
+    }
+
+    /* Imagen del comprobante: limita altura para no desbordar la hoja */
+    .printable-area img {
+      max-width: 100% !important;
+      height: auto !important;
+    }
+    /* Si tu sección de imagen tiene un wrapper, limita su altura total */
+    #imgWrap {
+      max-height: 120mm;      /* ~40% de la hoja; ajusta si lo deseas */
+      overflow: hidden !important;
+      border: 0 !important;
+      margin: 0 0 6mm 0 !important;
+      padding: 0 !important;
+    }
+
+    /* Grids a una sola columna para imprimir mejor */
+    .printable-area .grid {
+      display: block !important;
+    }
+    .printable-area .grid > * {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin-bottom: 4mm !important;
+    }
+
+    /* Quita botones/acciones dentro del detalle si quedaran visibles */
+    .printable-area button,
+    .printable-area a[href^="#/"],
+    .printable-area .no-print {
+      display: none !important;
+    }
+
+    /* Colores sólidos en impresión (mejor contraste) */
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+  }
+  `;
+  document.head.appendChild(style);
+}
+
 export default {
   async mount(container, { params }) {
     const id = params.get('id');
@@ -51,6 +143,8 @@ export default {
         </section>
       </div>
     `;
+
+    setupA4PrintStyles();
 
     const $ = s => container.querySelector(s);
     const refs = {
