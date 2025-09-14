@@ -72,11 +72,12 @@ function setupA4PrintStyles() {
     /* Grids a una sola columna para imprimir mejor */
     .printable-area .grid {
       display: block !important;
+      gap: 2mm !important;
     }
     .printable-area .grid > * {
       break-inside: avoid;
       page-break-inside: avoid;
-      margin-bottom: 4mm !important;
+      margin-bottom: 2mm !important;
     }
 
     /* Quita botones/acciones dentro del detalle si quedaran visibles */
@@ -102,7 +103,7 @@ function setupA4PrintStyles() {
     .printable-area.shrink {
       letter-spacing: 0 !important;
     }
-    .printable-area.shrink .grid > * { margin-bottom: 3mm !important; }
+    .printable-area.shrink .grid > * { margin-bottom: 1mm !important; }
     .printable-area.shrink h1,
     .printable-area.shrink h2,
     .printable-area.shrink h3 { margin-bottom: 4px !important; }
