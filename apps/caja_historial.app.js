@@ -131,7 +131,7 @@ export default {
     let alegraContactsCache = [];
     let alegraCategoriesCache = [];
 
-    const PAGE_SIZE = 50;
+    const PAGE_SIZE = 20;
     let pageIndex = 0;                 // página actual (0-based)
     let pageCursors = [];              // [{ lastDoc, size }]
     let currentUnsub = null;           // onSnapshot actual
@@ -171,7 +171,7 @@ export default {
     function buildPageQuery({ startAfterDoc = null }) {
       let qy = query(
         transfersCollection,
-        orderBy('createdAt', 'desc'),
+        orderBy('fecha', 'desc'),
         limit(PAGE_SIZE)
       );
       const bankId = filterBank.value;
@@ -266,7 +266,6 @@ export default {
         }
         return true;
       });
-
       renderHistory(filtered);
     }
 
