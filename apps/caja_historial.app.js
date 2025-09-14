@@ -172,7 +172,6 @@ export default {
       let qy = query(
         transfersCollection,
         orderBy('fecha', 'desc'),
-        orderBy('banco', 'asc'),
         limit(PAGE_SIZE)
       );
       const bankId = filterBank.value;
