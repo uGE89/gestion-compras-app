@@ -56,15 +56,14 @@ function setupA4PrintStyles() {
       line-height: 1.25 !important;
     }
 
-    /* Imagen del comprobante: limita altura para no desbordar la hoja */
+    /* Imagen del comprobante: se ajusta al espacio disponible */
     .printable-area img {
+      object-fit: contain !important;
       max-width: 100% !important;
-      height: auto !important;
+      max-height: 100% !important;
     }
-    /* Si tu sección de imagen tiene un wrapper, limita su altura total */
+    /* El contenedor de la imagen se dimensiona dinámicamente en JS */
     #imgWrap {
-      max-height: 120mm;      /* ~40% de la hoja; ajusta si lo deseas */
-      overflow: hidden !important;
       border: 0 !important;
       margin: 0 0 6mm 0 !important;
       padding: 0 !important;
@@ -205,7 +204,16 @@ export default {
       el.classList.remove('shrink');
       el.style.removeProperty('--print-scale');
 
-      // medimos altura real del contenido imprimible
+      // calcula espacio disponible para la imagen restando el contenido de texto
+      const { imgWrap, img } = refs;
+      if (!imgWrap.classList.contains('hidden')) {
+        img.style.maxHeight = '';
+        const cardHeightWithoutImg = el.getBoundingClientRect().height - imgWrap.getBoundingClientRect().height;
+        const remaining = usableHeightPx - cardHeightWithoutImg;
+        img.style.maxHeight = remaining > 0 ? `${remaining}px` : '0px';
+      }
+
+      // medimos altura real del contenido imprimible tras ajustar la imagen
       const rect = el.getBoundingClientRect();
       const currentHeight = rect.height;
 
@@ -229,6 +237,7 @@ export default {
       el.style.removeProperty('--print-scale');
       const obs = el.querySelector('#observaciones');
       if (obs) obs.classList.remove('clamp-print');
+      refs.img.style.removeProperty('max-height');
     }
 
     // hooks de impresión del navegador
