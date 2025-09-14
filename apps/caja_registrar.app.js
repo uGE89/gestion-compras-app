@@ -12,9 +12,12 @@ export default {
     // ---------- UI ----------
     container.innerHTML = `
       <div class="container mx-auto p-4 max-w-lg">
-        <header class="text-center mb-6">
-          <h1 class="text-3xl font-bold text-slate-900">Nuevo Registro</h1>
-          <p class="text-slate-500 mt-1">Sube un comprobante o estado de cuenta.</p>
+        <header class="mb-6 flex items-center">
+          <button id="back" type="button" class="text-slate-600 hover:text-slate-900">Volver</button>
+          <div class="flex-1 text-center">
+            <h1 class="text-3xl font-bold text-slate-900">Nuevo Registro</h1>
+            <p class="text-slate-500 mt-1">Sube un comprobante o estado de cuenta.</p>
+          </div>
         </header>
 
         <div id="register-wizard" class="bg-white rounded-2xl shadow-lg">
@@ -82,6 +85,7 @@ export default {
     const uploadPh   = $('#upload-placeholder');
     const aiLoader   = $('#ai-loader');
     const txForms    = $('#transaction-forms-container');
+    const backBtn    = $('#back');
 
     // ---------- Init ----------
     onAuthStateChanged(auth, (user) => { userId = user?.uid || null; if (!user) signInAnonymously(auth); });
@@ -89,6 +93,7 @@ export default {
     imagePanel.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', handleFileSelect);
     $('#cancel-btn').addEventListener('click', resetUI);
+    backBtn.addEventListener('click', () => { location.hash = '#/caja_historial'; });
     window.addEventListener('beforeunload', (e) => { if (isDataUnsaved) { e.preventDefault(); e.returnValue = ''; } });
 
     // Step control
