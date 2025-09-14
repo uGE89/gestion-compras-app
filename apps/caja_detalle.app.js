@@ -65,7 +65,7 @@ function setupA4PrintStyles() {
     /* El contenedor de la imagen se dimensiona dinámicamente en JS */
     #imgWrap {
       border: 0 !important;
-      margin: 0 0 6mm 0 !important;
+      margin: 0 !important;
       padding: 0 !important;
     }
 
@@ -73,6 +73,7 @@ function setupA4PrintStyles() {
     .printable-area .grid {
       display: block !important;
       gap: 2mm !important;
+      margin: 2mm 0 !important;
     }
     .printable-area .grid > * {
       break-inside: avoid;
