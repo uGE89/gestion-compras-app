@@ -37,6 +37,8 @@ export default {
             <div><div class="text-sm text-slate-600">Tipo</div><div class="font-semibold" id="tipo">—</div></div>
             <div><div class="text-sm text-slate-600">Moneda / Cantidad</div><div class="font-semibold" id="monto">—</div></div>
             <div><div class="text-sm text-slate-600">Estado</div><div class="font-semibold" id="status">—</div></div>
+            <div><div class="text-sm text-slate-600">Contacto (Alegra)</div><div class="font-semibold" id="contacto">—</div></div>
+            <div><div class="text-sm text-slate-600">Categoría (Alegra)</div><div class="font-semibold" id="categoria">—</div></div>
             <div class="md:col-span-2">
               <div class="text-sm text-slate-600">No. Confirmación</div>
               <div class="font-semibold break-words" id="numero_confirmacion">—</div>
@@ -60,6 +62,8 @@ export default {
       status: $('#status'),
       numero_confirmacion: $('#numero_confirmacion'),
       observaciones: $('#observaciones'),
+      contacto: $('#contacto'),
+      categoria: $('#categoria'),
       imgWrap: $('#imgWrap'),
       img: $('#img'),
       btnEditar: $('#btn-editar'),
@@ -89,6 +93,22 @@ export default {
       refs.numero_confirmacion.textContent = t.numero_confirmacion || '—';
       refs.observaciones.textContent = t.observaciones || '—';
 
+      // ---- Resolver nombres de Alegra (si hay IDs) ----
+      try {
+        const [cSnap, gSnap] = await Promise.all([
+          t.alegraContactId ? getDoc(doc(db, 'alegra_contacts', String(t.alegraContactId))) : null,
+          t.alegraCategoryId ? getDoc(doc(db, 'alegra_categories', String(t.alegraCategoryId))) : null,
+        ]);
+        const contactName  = cSnap?.exists() ? (cSnap.data().name || cSnap.id) : (t.alegraContactId ? t.alegraContactId : '—');
+        const categoryName = gSnap?.exists() ? (gSnap.data().name || gSnap.id) : (t.alegraCategoryId ? t.alegraCategoryId : '—');
+        refs.contacto.textContent  = contactName || '—';
+        refs.categoria.textContent = categoryName || '—';
+      } catch (e) {
+        // Si falla la carga, mostramos el ID en crudo como fallback
+        refs.contacto.textContent  = t.alegraContactId  || '—';
+        refs.categoria.textContent = t.alegraCategoryId || '—';
+      }
+
       if (t.imageUrl) {
         refs.img.src = t.imageUrl;
         refs.img.alt = 'Comprobante';
@@ -97,7 +117,7 @@ export default {
         refs.imgWrap.classList.add('hidden');
       }
 
-      refs.btnEditar.href = `#/caja_editar?id=${encodeURIComponent(id)}`;
+      refs.btnEditar.href = `#/caja-editar?id=${encodeURIComponent(id)}`;
       refs.btnAprobar.classList.toggle('hidden', t.status === 'approved');
 
       refs.btnAprobar.onclick = async () => {
