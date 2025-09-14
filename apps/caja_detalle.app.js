@@ -16,26 +16,25 @@ function setupA4PrintStyles() {
       margin: 12mm; /* márgenes solicitados */
     }
 
-    /* Oculta TODO excepto el detalle */
+    /* Oculta TODO excepto el detalle (sin colapsar layout) */
     body * {
-      display: none !important;
+      visibility: hidden !important;
     }
     .printable-area,
     .printable-area * {
-      display: revert !important; /* o display: initial */
+      visibility: visible !important;
     }
 
     /* Asegura que el detalle se ubique en la página dentro de los márgenes */
     .printable-area {
-      position: static !important;
+      position: relative !important;  /* o fixed si quieres despegarlo del flujo */
       box-shadow: none !important;
       border: none !important;
       background: #fff !important;
-      /* El ancho útil de A4 con 12mm de margen por lado ≈ 186mm */
       width: 186mm !important;
-      /* Evita que se corte en múltiples páginas */
       break-inside: avoid;
       page-break-inside: avoid;
+      z-index: 9999 !important; /* por si hay stacking contexts */
     }
 
     /* Contenedor general del detalle (si usas uno) */
@@ -300,8 +299,10 @@ export default {
       };
       refs.btnImprimir.onclick = () => {
         fitPrintableToA4Once();
-        // pequeño delay para asegurar reflow antes de abrir el diálogo
-        setTimeout(() => window.print(), 0);
+        // Asegura reflow (raf+timeout) antes del print dialog
+        requestAnimationFrame(() => {
+          setTimeout(() => window.print(), 0);
+        });
       };
       refs.btnEliminar.onclick = async () => {
         if (!confirm('¿Eliminar este registro?')) return;
