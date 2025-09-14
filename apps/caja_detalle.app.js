@@ -92,6 +92,29 @@ function setupA4PrintStyles() {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
+
+    /* escala controlada */
+    .printable-area.shrink {
+      transform-origin: top left !important;
+      transform: scale(var(--print-scale, 1)) !important;
+    }
+
+    /* más compacto aún (solo si aplicamos shrink) */
+    .printable-area.shrink {
+      letter-spacing: 0 !important;
+    }
+    .printable-area.shrink .grid > * { margin-bottom: 3mm !important; }
+    .printable-area.shrink h1,
+    .printable-area.shrink h2,
+    .printable-area.shrink h3 { margin-bottom: 4px !important; }
+
+    /* clamp de observaciones para evitar desbordes (ajusta el # de líneas) */
+    #observaciones.clamp-print {
+      display: -webkit-box !important;
+      -webkit-line-clamp: 8;
+      -webkit-box-orient: vertical;
+      overflow: hidden !important;
+    }
   }
   `;
   document.head.appendChild(style);
@@ -161,11 +184,56 @@ export default {
       categoria: $('#categoria'),
       imgWrap: $('#imgWrap'),
       img: $('#img'),
+      card: $('#card'),
       btnEditar: $('#btn-editar'),
       btnAprobar: $('#btn-aprobar'),
       btnImprimir: $('#btn-imprimir'),
       btnEliminar: $('#btn-eliminar'),
     };
+
+    function mmToPx(mm) {
+      // 96dpi ≈ 3.78 px/mm (suficientemente preciso para layout de impresión)
+      return mm * 3.78;
+    }
+    function fitPrintableToA4Once() {
+      const el = refs.card; if (!el) return;
+
+      // A4: 297mm alto total, márgenes: 12mm arriba + 12mm abajo => 273mm útiles
+      const usableHeightPx = mmToPx(297 - 12 - 12);
+
+      // quitamos transform por si quedó de una impresión previa
+      el.classList.remove('shrink');
+      el.style.removeProperty('--print-scale');
+
+      // medimos altura real del contenido imprimible
+      const rect = el.getBoundingClientRect();
+      const currentHeight = rect.height;
+
+      if (currentHeight > usableHeightPx) {
+        const scale = Math.max(0.6, Math.min(1, usableHeightPx / currentHeight));
+        el.style.setProperty('--print-scale', String(scale));
+        el.classList.add('shrink');
+
+        // como último recurso, clampa observaciones
+        const obs = el.querySelector('#observaciones');
+        if (obs) obs.classList.add('clamp-print');
+      } else {
+        const obs = el.querySelector('#observaciones');
+        if (obs) obs.classList.remove('clamp-print');
+      }
+    }
+
+    function resetPrintableScale() {
+      const el = refs.card; if (!el) return;
+      el.classList.remove('shrink');
+      el.style.removeProperty('--print-scale');
+      const obs = el.querySelector('#observaciones');
+      if (obs) obs.classList.remove('clamp-print');
+    }
+
+    // hooks de impresión del navegador
+    window.addEventListener('beforeprint', fitPrintableToA4Once);
+    window.addEventListener('afterprint', resetPrintableScale);
 
     async function load() {
       const snap = await getDoc(doc(db, 'transferencias', id));
@@ -219,7 +287,11 @@ export default {
         await updateDoc(doc(db, 'transferencias', id), { status: 'approved', updatedAt: serverTimestamp() });
         await load();
       };
-      refs.btnImprimir.onclick = () => window.print();
+      refs.btnImprimir.onclick = () => {
+        fitPrintableToA4Once();
+        // pequeño delay para asegurar reflow antes de abrir el diálogo
+        setTimeout(() => window.print(), 0);
+      };
       refs.btnEliminar.onclick = async () => {
         if (!confirm('¿Eliminar este registro?')) return;
         await deleteDoc(doc(db, 'transferencias', id));
