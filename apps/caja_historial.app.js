@@ -7,7 +7,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import {
   collection, onSnapshot, doc, deleteDoc, query, orderBy,
-  serverTimestamp, getDoc, updateDoc, where, getDocs, addDoc
+  serverTimestamp, getDoc, updateDoc, where, getDocs, addDoc,
+  limit, startAfter
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 export default {
@@ -60,6 +61,13 @@ export default {
               <p class="ml-3 text-slate-500">Cargando registros...</p>
             </div>
           </div>
+          <div id="pager" class="mt-4 flex items-center justify-between">
+            <button id="prevPage" class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 disabled:opacity-50">Anterior</button>
+            <div class="text-sm text-slate-600">
+              <span id="pageLabel">Página 1</span>
+            </div>
+            <button id="nextPage" class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 disabled:opacity-50">Siguiente</button>
+          </div>
         </main>
       </div>
 
@@ -105,6 +113,10 @@ export default {
     const $ = s => container.querySelector(s);
     const historyList   = $('#history-list');
     const historyLoader = $('#history-loader');
+    const pager         = $('#pager');
+    const prevBtn       = $('#prevPage');
+    const nextBtn       = $('#nextPage');
+    const pageLabel     = $('#pageLabel');
     const filterStartDate = $('#filter-start-date');
     const filterEndDate   = $('#filter-end-date');
     const filterBank      = $('#filter-bank');
@@ -118,8 +130,12 @@ export default {
 
     let alegraContactsCache = [];
     let alegraCategoriesCache = [];
-    let allTransfers = [];
-    let unsub = null;
+
+    const PAGE_SIZE = 50;
+    let pageIndex = 0;                 // página actual (0-based)
+    let pageCursors = [];              // [{ lastDoc, size }]
+    let currentUnsub = null;           // onSnapshot actual
+    let currentRawDocs = [];           // docs crudos de la página (antes de filtros client-side)
 
     function showModal(msg, onOk){
       modalMsg.textContent = msg;
@@ -152,6 +168,38 @@ export default {
           .map(acc => `<option value="${acc.id}">${acc.name}</option>`).join('');
     })();
 
+    function buildPageQuery({ startAfterDoc = null }) {
+      let qy = query(
+        transfersCollection,
+        orderBy('createdAt', 'desc'),
+        limit(PAGE_SIZE)
+      );
+      const bankId = filterBank.value;
+      const status = filterStatus.value;
+      if (status) qy = query(qy, where('status', '==', status));
+      if (bankId) qy = query(qy, where('bankAccountId', '==', Number(bankId)));
+      if (startAfterDoc) qy = query(qy, startAfter(startAfterDoc));
+      return qy;
+    }
+
+    async function attachPage(page) {
+      // limpia suscripción anterior
+      if (currentUnsub) { currentUnsub(); currentUnsub = null; }
+
+      const startAfterDoc = page > 0 ? pageCursors[page - 1]?.lastDoc : null;
+      const qy = buildPageQuery({ startAfterDoc });
+
+      historyLoader.classList.remove('hidden');
+      currentUnsub = onSnapshot(qy, (snap) => {
+        historyLoader.classList.add('hidden');
+        currentRawDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const lastDoc = snap.docs[snap.docs.length - 1] || null;
+        pageCursors[page] = { lastDoc, size: snap.docs.length };
+        renderWithClientFilters();
+        updatePagerUI();
+      });
+    }
+
     onAuthStateChanged(auth, async (user) => {
       if (!user) return;
       await loadInitialData();
@@ -166,12 +214,10 @@ export default {
         alegraContactsCache = contactsSnap.docs.map(d => ({id:d.id, ...d.data()}));
         alegraCategoriesCache = categoriesSnap.docs.map(d => ({id:d.id, ...d.data()}));
 
-        if (unsub) unsub();
-        unsub = onSnapshot(query(transfersCollection, orderBy('createdAt','desc')), (snap) => {
-          historyLoader.classList.add('hidden');
-          allTransfers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          applyFilters();
-        });
+        // Primera página
+        pageIndex = 0;
+        pageCursors = [];
+        await attachPage(pageIndex);
       } catch(err){
         console.error(err);
         toast('Error al cargar datos.', 'error');
@@ -198,21 +244,16 @@ export default {
       return d.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' });
     }
 
-    function applyFilters(){
+    function renderWithClientFilters(){
       const startDate = filterStartDate.value;
       const endDate   = filterEndDate.value;
-      const bankId    = filterBank.value;
-      const status    = filterStatus.value;
       const term      = generalSearch.value.trim().toLowerCase();
 
-      const filtered = allTransfers.filter(t => {
+      const filtered = currentRawDocs.filter(t => {
         const dateValue = t.fecha ? new Date(t.fecha + 'T00:00:00')
           : (t.createdAt?.toDate ? t.createdAt.toDate() : null);
-
         if (startDate && dateValue && dateValue < new Date(startDate + 'T00:00:00')) return false;
         if (endDate   && dateValue && dateValue > new Date(endDate   + 'T23:59:59')) return false;
-        if (bankId && String(t.bankAccountId || '') !== bankId) return false;
-        if (status && t.status !== status) return false;
 
         if (term){
           const contact  = alegraContactsCache.find(c => c.id === t.alegraContactId);
@@ -228,6 +269,25 @@ export default {
 
       renderHistory(filtered);
     }
+
+    function updatePagerUI(){
+      pageLabel.textContent = `Página ${pageIndex + 1}`;
+      const size = pageCursors[pageIndex]?.size ?? 0;
+      prevBtn.disabled = pageIndex === 0;
+      nextBtn.disabled = size < PAGE_SIZE; // si vino menos del page size, ya no hay más
+    }
+
+    prevBtn.addEventListener('click', () => {
+      if (pageIndex === 0) return;
+      pageIndex -= 1;
+      attachPage(pageIndex);
+    });
+    nextBtn.addEventListener('click', () => {
+      const size = pageCursors[pageIndex]?.size ?? 0;
+      if (size < PAGE_SIZE) return;
+      pageIndex += 1;
+      attachPage(pageIndex);
+    });
 
     function renderHistory(list){
       if (!list.length){
@@ -334,8 +394,17 @@ export default {
       }
     });
 
-    [filterStartDate, filterEndDate, filterBank, filterStatus, generalSearch].forEach(el => {
-      el?.addEventListener('input', applyFilters);
+    // Filtros que NO reconsultan (texto/fechas) → re-render local:
+    [generalSearch, filterStartDate, filterEndDate].forEach(el => {
+      el?.addEventListener('input', renderWithClientFilters);
+    });
+    // Filtros que SÍ cambian el query (banco/estado) → reset paginación y re-attach:
+    [filterBank, filterStatus].forEach(el => {
+      el?.addEventListener('change', () => {
+        pageIndex = 0;
+        pageCursors = [];
+        attachPage(pageIndex);
+      });
     });
   },
 
