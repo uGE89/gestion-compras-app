@@ -117,7 +117,7 @@ export default {
         refs.imgWrap.classList.add('hidden');
       }
 
-      refs.btnEditar.href = `#/caja-editar?id=${encodeURIComponent(id)}`;
+      refs.btnEditar.href = `#/caja_editar?id=${encodeURIComponent(id)}`;
       refs.btnAprobar.classList.toggle('hidden', t.status === 'approved');
 
       refs.btnAprobar.onclick = async () => {

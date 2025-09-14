@@ -20,7 +20,7 @@ export default {
             <h1 class="text-3xl font-bold text-slate-900">Historial de Transferencias</h1>
             <p class="text-slate-500 mt-1">Consulta, filtra, edita y aprueba los registros existentes.</p>
           </div>
-          <a href="#/caja-registrar" class="mt-3 md:mt-0 px-3 py-2 bg-blue-600 text-white rounded-lg">Nuevo</a>
+            <a href="#/caja_registrar" class="mt-3 md:mt-0 px-3 py-2 bg-blue-600 text-white rounded-lg">Nuevo</a>
         </header>
 
         <main class="bg-white p-6 md:p-8 rounded-2xl shadow-xl">
@@ -335,16 +335,16 @@ export default {
         if (t.alegraPaymentId)     extraInfo += ` | <span class="font-medium">Alegra ID:</span> ${t.alegraPaymentId}`;
       }
 
-      const viewBtn = `<a href="#/caja-detalle?id=${encodeURIComponent(t.id)}" class="view-btn bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold py-2 px-3 rounded-lg text-sm"><span class="material-icons text-base">visibility</span> Ver</a>`;
+        const viewBtn = `<a href="#/caja_detalle?id=${encodeURIComponent(t.id)}" class="view-btn bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold py-2 px-3 rounded-lg text-sm"><span class="material-icons text-base">visibility</span> Ver</a>`;
       const editOrReviewBtn = (t.status === 'pending_review' && !hasMirror)
-        ? `<a href="#/caja-editar?id=${encodeURIComponent(t.id)}" class="edit-btn bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-2 px-3 rounded-lg text-sm"><span class="material-icons text-base">edit</span> Revisar</a>`
+        ? `<a href="#/caja_editar?id=${encodeURIComponent(t.id)}" class="edit-btn bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-2 px-3 rounded-lg text-sm"><span class="material-icons text-base">edit</span> Revisar</a>`
         : viewBtn;
 
       const approveBtn = t.status !== 'approved'
         ? `<button data-id="${t.id}" class="approve-btn bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold py-2 px-3 rounded-lg text-sm"><span class="material-icons text-base">check_circle</span> Aprobar</button>`
         : '';
 
-      const printBtn = `<a href="#/caja-detalle?id=${encodeURIComponent(t.id)}" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium p-2 rounded-lg text-sm"><span class="material-icons text-base">print</span></a>`;
+        const printBtn = `<a href="#/caja_detalle?id=${encodeURIComponent(t.id)}" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium p-2 rounded-lg text-sm"><span class="material-icons text-base">print</span></a>`;
       const deleteBtn = `<button data-id="${t.id}" class="delete-btn bg-red-100 hover:bg-red-200 text-red-700 font-medium p-2 rounded-lg text-sm"><span class="material-icons text-base">delete</span></button>`;
 
       return `
