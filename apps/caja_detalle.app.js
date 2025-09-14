@@ -18,10 +18,11 @@ function setupA4PrintStyles() {
 
     /* Oculta TODO excepto el detalle */
     body * {
-      visibility: hidden !important;
+      display: none !important;
     }
-    .printable-area, .printable-area * {
-      visibility: visible !important;
+    .printable-area,
+    .printable-area * {
+      display: revert !important; /* o display: initial */
     }
 
     /* Asegura que el detalle se ubique en la página dentro de los márgenes */
