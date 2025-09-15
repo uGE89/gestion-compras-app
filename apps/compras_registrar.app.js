@@ -1,10 +1,15 @@
 // apps/compras_registrar.app.js
+import { FIREBASE_BASE } from './lib/constants.js';
 import {
-  collection, addDoc, query, where, getDocs,
+  collection,
+  addDoc,
+  query,
+  where,
+  getDocs,
   serverTimestamp
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+} from `${FIREBASE_BASE}firebase-firestore.js`;
 import { ref, uploadBytes, getDownloadURL }
-  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+  from `${FIREBASE_BASE}firebase-storage.js`;
 import { ItemsEditor } from './components/items_editor.js';
 import { associateItemsBatch, persistMappingsForItems } from './lib/associations.js';
 import { showToast } from './lib/toast.js';

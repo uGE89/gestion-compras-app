@@ -1,6 +1,7 @@
 // apps/lib/associations.js
-import { doc, getDoc, setDoc, serverTimestamp, increment } 
-  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { FIREBASE_BASE } from './constants.js';
+import { doc, getDoc, setDoc, serverTimestamp, increment }
+  from `${FIREBASE_BASE}firebase-firestore.js`;
 import { cacheGet, cachePut } from './mapping_cache.js';
 
 export const MAP_COLLECTION = 'mapeo_articulos';

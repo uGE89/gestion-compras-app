@@ -1,10 +1,12 @@
 // apps/cotizaciones_registrar.app.js
+import { FIREBASE_BASE } from './lib/constants.js';
 import {
-  collection, addDoc,
+  collection,
+  addDoc,
   serverTimestamp
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+} from `${FIREBASE_BASE}firebase-firestore.js`;
 import { ref, uploadBytes, getDownloadURL }
-  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+  from `${FIREBASE_BASE}firebase-storage.js`;
 import { ItemsEditor } from './components/items_editor.js';
 const COT_COLLECTION = 'cotizaciones_analizadas';
 import { associateItemsBatch, persistMappingsForItems } from './lib/associations.js';

@@ -1,11 +1,18 @@
 // /public/apps/caja_transferir.app.js
 import { db } from '../firebase-init.js';
+import { FIREBASE_BASE } from './lib/constants.js';
 import {
-  collection, doc, getDoc, setDoc, runTransaction, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import {
-  query, where, getDocs, updateDoc
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  runTransaction,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
+  updateDoc
+} from `${FIREBASE_BASE}firebase-firestore.js`;
 import { USD_TO_NIO_RATE } from '../constants.js';
 
 const accountMappingsArray = [

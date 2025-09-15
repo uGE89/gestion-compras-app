@@ -1,8 +1,13 @@
 // apps/compras_historial.app.js
 import { SearchBar, Paginator } from '../framework/components.js';
+import { FIREBASE_BASE } from './lib/constants.js';
 import {
-  collection, query, orderBy, onSnapshot, where
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+  where
+} from `${FIREBASE_BASE}firebase-firestore.js`;
 
 export default {
   title: 'Historial de Compras',

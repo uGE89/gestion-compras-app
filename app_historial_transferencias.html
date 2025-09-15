@@ -74,8 +74,9 @@
 
 <script type="module">
     import { auth, db } from './firebase-init.js';
-    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { collection, onSnapshot, doc, deleteDoc, query, orderBy, serverTimestamp, getDoc, updateDoc, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { FIREBASE_BASE } from './apps/lib/constants.js';
+    import { onAuthStateChanged } from `${FIREBASE_BASE}firebase-auth.js`;
+    import { collection, onSnapshot, doc, deleteDoc, query, orderBy, serverTimestamp, getDoc, updateDoc, where, getDocs, addDoc } from `${FIREBASE_BASE}firebase-firestore.js`;
     import { toNio } from './export_utils.js';
     import { showToast } from './apps/lib/toast.js';
 

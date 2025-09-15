@@ -1,7 +1,8 @@
 // auth.js - Módulo reutilizable para la autenticación de Firebase
 
 // --- Importaciones de Firebase ---
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { FIREBASE_BASE } from './apps/lib/constants.js';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from `${FIREBASE_BASE}firebase-auth.js`;
 
 // --- Variables del Módulo ---
 let auth;
