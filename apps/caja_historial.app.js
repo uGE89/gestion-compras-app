@@ -89,7 +89,6 @@ export default {
     const transfersCollection = collection(db, 'transferencias');
     const alegraContactsCollection = collection(db, 'alegra_contacts');
     const alegraCategoriesCollection = collection(db, 'alegra_categories');
-    const USD_TO_NIO_RATE = 36.6;
 
     // Mapeo de cuentas (igual que el tuyo)
     const accountMappingsArray = [
@@ -324,10 +323,10 @@ export default {
       const hasMirror = t.mirrorTransactionId || t.originalTransactionId;
 
       const formattedDate = t.fecha ? new Date(t.fecha + 'T00:00:00').toLocaleDateString('es-ES') : 'N/A';
-      const nioAmount = t.moneda === 'USD' ? (t.cantidad || 0) * USD_TO_NIO_RATE : (t.cantidad || 0);
-      const amountHtml = t.moneda === 'USD'
-        ? `<span class="font-bold ${typeColor}">${(t.cantidad || 0).toFixed(2)} USD (C$${nioAmount.toFixed(2)})</span>`
-        : `<span class="font-bold ${typeColor}">C$${nioAmount.toFixed(2)}</span>`;
+      const originalAmount = Number(t.cantidad || 0);
+      const nioAmount = Number(t.cantidadNIO || 0);
+      const currencyLabel = t.moneda === 'USD' ? 'USD' : 'C$';
+      const amountHtml = `<span class="font-bold ${typeColor}">${originalAmount.toFixed(2)} ${currencyLabel} (C$${nioAmount.toFixed(2)})</span>`;
 
       let extraInfo = '';
       if (t.status === 'approved'){
