@@ -2,12 +2,24 @@
 // Historial de Caja Chica (filtrado a una cuenta fija) + totales por filtros
 
 import { auth, db } from '../firebase-init.js';
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { FIREBASE_BASE } from './lib/constants.js';
+import { onAuthStateChanged } from `${FIREBASE_BASE}firebase-auth.js`;
 import {
-  collection, onSnapshot, doc, deleteDoc, query, orderBy,
-  serverTimestamp, getDoc, updateDoc, where, getDocs, addDoc,
-  limit, startAfter
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  collection,
+  onSnapshot,
+  doc,
+  deleteDoc,
+  query,
+  orderBy,
+  serverTimestamp,
+  getDoc,
+  updateDoc,
+  where,
+  getDocs,
+  addDoc,
+  limit,
+  startAfter
+} from `${FIREBASE_BASE}firebase-firestore.js`;
 import { toNio } from '../export_utils.js';
 import { showToast } from './lib/toast.js';
 

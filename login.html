@@ -73,8 +73,9 @@
     // --- Importaciones ---
     // Importa el servicio 'auth' ya inicializado desde el archivo central.
     import { auth } from './firebase-init.js';
+    import { FIREBASE_BASE } from './apps/lib/constants.js';
     // Importa las funciones específicas de autenticación que usarás en esta página.
-    import { onAuthStateChanged, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { onAuthStateChanged, signInWithEmailAndPassword } from `${FIREBASE_BASE}firebase-auth.js`;
 
     // --- ELEMENTOS DEL DOM ---
     const loginForm = document.getElementById('login-form');

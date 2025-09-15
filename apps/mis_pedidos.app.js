@@ -1,4 +1,6 @@
 // apps/mis_pedidos.app.js
+import { FIREBASE_BASE } from './lib/constants.js';
+
 export default {
   async mount(container, { appState, auth, db }) {
     // === UI base ===
@@ -157,7 +159,7 @@ export default {
     async function loadSavedOrders() {
       if (!currentUser) return;
       const { collection, getDocs, query, where } = await import(
-        'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js'
+        `${FIREBASE_BASE}firebase-firestore.js`
       );
       const q = query(collection(db, 'pedidos'), where('userId', '==', currentUser.uid));
       const snap = await getDocs(q);
@@ -167,7 +169,7 @@ export default {
 
     async function openOrder(orderId) {
       const { doc, getDoc } = await import(
-        'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js'
+        `${FIREBASE_BASE}firebase-firestore.js`
       );
       const snap = await getDoc(doc(db, 'pedidos', orderId));
       if (!snap.exists()) {
@@ -179,7 +181,7 @@ export default {
 
     async function printOrder(orderId) {
       const { doc, getDoc } = await import(
-        'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js'
+        `${FIREBASE_BASE}firebase-firestore.js`
       );
       const snap = await getDoc(doc(db, 'pedidos', orderId));
       if (!snap.exists()) {

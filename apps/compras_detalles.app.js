@@ -1,9 +1,14 @@
 // apps/compras_detalles.app.js
+import { FIREBASE_BASE } from './lib/constants.js';
 import {
-  doc, getDoc, updateDoc, arrayUnion, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  doc,
+  getDoc,
+  updateDoc,
+  arrayUnion,
+  serverTimestamp
+} from `${FIREBASE_BASE}firebase-firestore.js`;
 import { ref, uploadBytes, getDownloadURL }
-  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+  from `${FIREBASE_BASE}firebase-storage.js`;
 
 export default {
   title: 'Detalles de Compra',

@@ -1,5 +1,6 @@
 // apps/creador_pedido.app.js
 import { SearchBar, Paginator } from '../framework/components.js';
+import { FIREBASE_BASE } from './lib/constants.js';
 
 export default {
   async mount(container, { appState, auth, db }) {
@@ -540,7 +541,7 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
 
   try {
     const { addDoc, collection, serverTimestamp } = await import(
-      'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js'
+      `${FIREBASE_BASE}firebase-firestore.js`
     );
 
     const orderData = {

@@ -1,7 +1,11 @@
 // apps/cotizaciones_editar.app.js
+import { FIREBASE_BASE } from './lib/constants.js';
 import {
-  doc, getDoc, updateDoc, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  doc,
+  getDoc,
+  updateDoc,
+  serverTimestamp
+} from `${FIREBASE_BASE}firebase-firestore.js`;
 import { ItemsEditor } from './components/items_editor.js';
 import { persistMappingsForItems } from './lib/associations.js';
 import { showToast } from './lib/toast.js';

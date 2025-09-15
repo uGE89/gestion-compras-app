@@ -1,10 +1,17 @@
 // apps/compras_editar.app.js
+import { FIREBASE_BASE } from './lib/constants.js';
 import {
-  collection, doc, getDoc, updateDoc,
-  query, where, getDocs, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  collection,
+  doc,
+  getDoc,
+  updateDoc,
+  query,
+  where,
+  getDocs,
+  serverTimestamp
+} from `${FIREBASE_BASE}firebase-firestore.js`;
 import { ref, uploadBytes, getDownloadURL }
-  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+  from `${FIREBASE_BASE}firebase-storage.js`;
 import { ItemsEditor } from './components/items_editor.js';
 import { persistMappingsForItems } from './lib/associations.js';
 import { showToast } from './lib/toast.js';
@@ -102,7 +109,7 @@ export default {
       if (!description) return null;
       const mapId = description.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-');
       const mref = doc(db, MAP_COLLECTION, mapId);
-      const snap = await (await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js")).getDoc(mref);
+      const snap = await (await import(`${FIREBASE_BASE}firebase-firestore.js`)).getDoc(mref);
       return snap.exists() ? snap.data() : null;
     }
 

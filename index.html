@@ -87,8 +87,9 @@
 
 <script type="module">
     import { appState, hydrateDrafts, savePedidoDraft, saveCotizacionDraft } from './state.js';
-    import { auth, db as firestoreDb, storage as firebaseStorage } from './firebase-init.js';    
-    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { auth, db as firestoreDb, storage as firebaseStorage } from './firebase-init.js';
+    import { FIREBASE_BASE } from './apps/lib/constants.js';
+    import { onAuthStateChanged, signOut } from `${FIREBASE_BASE}firebase-auth.js`;
     import { loadContent } from './app_loader.js';
     import { createRouter } from './framework/router-lite.js';
     import { registry } from './framework/registry.js';
