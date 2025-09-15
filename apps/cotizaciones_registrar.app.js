@@ -3,11 +3,15 @@ import {
   collection, addDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { ref, uploadBytes, getDownloadURL }
-  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 import { ItemsEditor } from './components/items_editor.js';
 const COT_COLLECTION = 'cotizaciones_analizadas';
 import { associateItemsBatch, persistMappingsForItems } from './lib/associations.js';
+import {
+  pdfToImages,
+  fileToDataURL,
+  dataUrlToBlob,
+  uploadToStorage
+} from './lib/file_utils.js';
 import { parseNumber } from '../export_utils.js';
 import { DEFAULT_EXCHANGE_RATE } from '../constants.js';
 
@@ -46,22 +50,6 @@ export default {
         return JSON.parse(raw);
       }catch(e){ console.error(e); toast('Error de IA','error'); return null; }
     }
-
-    async function ensurePdf(){ if(typeof pdfjsLib!=='undefined') return;
-      await new Promise((ok,ko)=>{ const s=document.createElement('script');
-        s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js';
-        s.onload=()=>{ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js'; ok(); };
-        s.onerror=ko; document.head.appendChild(s); });}
-    async function pdfToImgs(file){
-      await ensurePdf(); const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
-      const imgs=[]; for(let i=1;i<=pdf.numPages;i++){const page=await pdf.getPage(i);
-        const v=page.getViewport({scale:1.5}); const c=document.createElement('canvas'); const ctx=c.getContext('2d');
-        c.width=v.width; c.height=v.height; await page.render({canvasContext:ctx,viewport:v}).promise;
-        imgs.push(c.toDataURL('image/jpeg'));} return imgs;}
-    const fileToB64 = f => new Promise(r=>{const rd=new FileReader(); rd.onload=e=>r(e.target.result); rd.readAsDataURL(f);});
-    const dataUrlToBlob = d => fetch(d).then(r=>r.blob());
-    async function uploadToStorage(fileOrBlob, path){
-      const sref=ref(storage,path); const snap=await uploadBytes(sref,fileOrBlob); return getDownloadURL(snap.ref); }
 
     // === UI
     container.innerHTML = `
@@ -136,17 +124,17 @@ export default {
       try{
         for (const f of files){
           if (f.type.startsWith('image/')){
-            const b64=await fileToB64(f); base64.push(b64.split(',')[1]);
+            const b64=await fileToDataURL(f); base64.push(b64.split(',')[1]);
             appendPrev(prev, b64);
-            uploads.push(uploadToStorage(f, `quotes/${userId}/${rfqId}/${Date.now()}-${f.name}`));
+            uploads.push(uploadToStorage(storage, f, `quotes/${userId}/${rfqId}/${Date.now()}-${f.name}`));
           } else if (f.type==='application/pdf'){
             txt.textContent=`Convirtiendo PDF: ${f.name}…`;
-            const imgs=await pdfToImgs(f);
+            const imgs=await pdfToImages(f);
             for (let i=0;i<imgs.length;i++){
               appendPrev(prev, imgs[i]);
               base64.push(imgs[i].split(',')[1]);
               const blob=await dataUrlToBlob(imgs[i]);
-              uploads.push(uploadToStorage(blob, `quotes/${userId}/${rfqId}/${Date.now()}-${f.name}-p${i+1}.jpg`));
+              uploads.push(uploadToStorage(storage, blob, `quotes/${userId}/${rfqId}/${Date.now()}-${f.name}-p${i+1}.jpg`));
             }
           }
         }

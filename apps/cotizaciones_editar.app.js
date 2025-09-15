@@ -3,6 +3,7 @@ import {
   doc, getDoc, updateDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { ItemsEditor } from './components/items_editor.js';
+import { pdfToImages, fileToDataURL } from './lib/file_utils.js';
 import { persistMappingsForItems } from './lib/associations.js';
 import { parseNumber } from '../export_utils.js';
 import { DEFAULT_EXCHANGE_RATE } from '../constants.js';
@@ -48,30 +49,6 @@ export default {
         const raw  = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';
         return JSON.parse(raw);
       } catch (e) { console.error(e); showToast('Error de IA','error'); return null; }
-    }
-    async function ensurePdfJs(){
-      if (typeof pdfjsLib !== 'undefined') return;
-      await new Promise((resolve,reject)=>{
-        const s=document.createElement('script');
-        s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js';
-        s.onload=()=>{ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js'; resolve(); };
-        s.onerror=reject; document.head.appendChild(s);
-      });
-    }
-    async function fileToDataURL(file){ return new Promise(res=>{const r=new FileReader(); r.onload=e=>res(e.target.result); r.readAsDataURL(file);}); }
-    async function pdfToImages(file){
-      await ensurePdfJs();
-      const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-      const out=[];
-      for(let i=1;i<=pdf.numPages;i++){
-        const page=await pdf.getPage(i);
-        const viewport=page.getViewport({scale:1.5});
-        const canvas=document.createElement('canvas'); const ctx=canvas.getContext('2d');
-        canvas.width=viewport.width; canvas.height=viewport.height;
-        await page.render({canvasContext:ctx, viewport}).promise;
-        out.push(canvas.toDataURL('image/jpeg'));
-      }
-      return out;
     }
     async function findAssociation(description){
       if (!description) return null;

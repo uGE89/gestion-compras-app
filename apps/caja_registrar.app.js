@@ -5,7 +5,7 @@ import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/f
 import {
   collection, addDoc, serverTimestamp, getDocs, query, where
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+import { pdfToImages, fileToDataURL, uploadToStorage } from './lib/file_utils.js';
 import { toNio } from '../export_utils.js';
 
 export default {
@@ -139,13 +139,14 @@ export default {
           base64 = await renderPdfToImage(file); // dataURL
           mimeForAI = 'image/jpeg';
         } else {
-          base64 = await fileToBase64(file);
+          base64 = await fileToDataURL(file);
           mimeForAI = file.type;
         }
         imgPrev.src = base64; imgPrev.classList.remove('hidden');
 
         // Subir archivo original a Storage
-        currentImageUrl = await uploadFileToStorage(file);
+        if (!userId) throw new Error('Usuario no autenticado.');
+        currentImageUrl = await uploadToStorage(storage, file, `transfer-images/${userId}/${Date.now()}_${file.name}`);
 
         // Garantiza caches de Alegra
         if (!alegraContactsCache.length || !alegraCategoriesCache.length) {
@@ -187,47 +188,33 @@ export default {
       }
     }
 
-    async function uploadFileToStorage(file) {
-      if (!userId) throw new Error('Usuario no autenticado.');
-      const storageRef = ref(storage, `transfer-images/${userId}/${Date.now()}_${file.name}`);
-      const up = await uploadBytes(storageRef, file);
-      return await getDownloadURL(up.ref);
+    async function renderPdfToImage(file) {
+      const pages = await pdfToImages(file, { scale: 3, quality: 0.9 });
+      if (!pages.length) throw new Error('PDF sin páginas');
+      if (pages.length === 1) return pages[0];
+
+      const images = await Promise.all(pages.map(loadImage));
+      const width = Math.max(...images.map(img => img.width));
+      const totalHeight = images.reduce((sum, img) => sum + img.height, 0);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = totalHeight;
+      const ctx = canvas.getContext('2d');
+      let y = 0;
+      for (const img of images) {
+        ctx.drawImage(img, 0, y);
+        y += img.height;
+      }
+      return canvas.toDataURL('image/jpeg', 0.9);
     }
 
-    async function renderPdfToImage(file) {
-      // Carga pdf.js on-demand si no existe
-      if (!window.pdfjsLib) {
-        await new Promise((res, rej) => {
-          const s = document.createElement('script');
-          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js';
-          s.onload = res; s.onerror = rej;
-          document.head.appendChild(s);
-        });
-      }
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
-
-      const ab = await file.arrayBuffer();
-      const pdf = await window.pdfjsLib.getDocument(new Uint8Array(ab)).promise;
-      const canvases = [];
-      let totalH = 0;
-      const quality = 1.5;
-
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 2 * quality });
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width; canvas.height = viewport.height;
-        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-        canvases.push(canvas); totalH += canvas.height;
-      }
-      if (!canvases.length) throw new Error('PDF sin páginas');
-
-      const stitched = document.createElement('canvas');
-      stitched.width = canvases[0].width; stitched.height = totalH;
-      const ctx = stitched.getContext('2d');
-      let y = 0; for (const c of canvases) { ctx.drawImage(c, 0, y); y += c.height; }
-      return stitched.toDataURL('image/jpeg', 0.9);
+    function loadImage(dataUrl) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = dataUrl;
+      });
     }
 
     async function getAIData(base64, mimeType) {
@@ -519,9 +506,6 @@ export default {
       $('#toast-container').appendChild(div);
       setTimeout(()=>div.remove(), 3500);
     }
-    const fileToBase64 = (file) => new Promise((res, rej) => {
-      const r = new FileReader(); r.onload = e => res(e.target.result); r.onerror = rej; r.readAsDataURL(file);
-    });
     function cleanAmount(amount) {
       if (amount === null || amount === undefined) return null;
       let s = String(amount).replace(/[^\d,.]/g,'');

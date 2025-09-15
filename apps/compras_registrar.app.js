@@ -3,10 +3,14 @@ import {
   collection, addDoc, query, where, getDocs,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { ref, uploadBytes, getDownloadURL }
-  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 import { ItemsEditor } from './components/items_editor.js';
 import { associateItemsBatch, persistMappingsForItems } from './lib/associations.js';
+import {
+  pdfToImages,
+  fileToDataURL,
+  dataUrlToBlob,
+  uploadToStorage
+} from './lib/file_utils.js';
 import { parseNumber } from '../export_utils.js';
 import { DEFAULT_EXCHANGE_RATE } from '../constants.js';
 
@@ -64,38 +68,6 @@ export default {
         showToast('Error de IA. Formato inválido o red.', 'error');
         return null;
       }
-    }
-
-    // ===== PDF.js on-demand =====
-    async function ensurePdfJs() {
-      if (typeof pdfjsLib !== 'undefined') return;
-      await new Promise((resolve, reject)=>{
-        const s=document.createElement('script');
-        s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js';
-        s.onload=()=>{ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js'; resolve(); };
-        s.onerror=reject; document.head.appendChild(s);
-      });
-    }
-    async function pdfToImages(file){
-      await ensurePdfJs();
-      const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-      const imgs = [];
-      for (let i=1;i<=pdf.numPages;i++){
-        const page=await pdf.getPage(i);
-        const viewport=page.getViewport({scale:1.5});
-        const canvas=document.createElement('canvas'); const ctx=canvas.getContext('2d');
-        canvas.width=viewport.width; canvas.height=viewport.height;
-        await page.render({canvasContext:ctx, viewport}).promise;
-        imgs.push(canvas.toDataURL('image/jpeg'));
-      }
-      return imgs;
-    }
-    function fileToDataURL(file){ return new Promise((res)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.readAsDataURL(file); }); }
-    function dataUrlToBlob(dataUrl){ return fetch(dataUrl).then(r=>r.blob()); }
-    async function uploadToStorage(fileOrBlob, path){
-      const storageRef = ref(storage, path);
-      const snap = await uploadBytes(storageRef, fileOrBlob);
-      return getDownloadURL(snap.ref);
     }
 
     // ===== UI =====
@@ -211,7 +183,7 @@ export default {
             const base64 = await fileToDataURL(file);
             appendPreviewImage(preview, base64);
             base64ForAI.push(base64.split(',')[1]);
-            uploadPromises.push(uploadToStorage(file, `invoices/${userId}/${Date.now()}-${file.name}`));
+            uploadPromises.push(uploadToStorage(storage, file, `invoices/${userId}/${Date.now()}-${file.name}`));
           } else if (file.type === 'application/pdf') {
             aiLoaderText.textContent = `Convirtiendo PDF: ${file.name}...`;
             const imgs = await pdfToImages(file);
@@ -220,7 +192,7 @@ export default {
               appendPreviewImage(preview, base64);
               base64ForAI.push(base64.split(',')[1]);
               const blob = await dataUrlToBlob(base64);
-              uploadPromises.push(uploadToStorage(blob, `invoices/${userId}/${Date.now()}-${file.name}-page-${i+1}.jpg`));
+              uploadPromises.push(uploadToStorage(storage, blob, `invoices/${userId}/${Date.now()}-${file.name}-page-${i+1}.jpg`));
             }
           }
         }
