@@ -250,9 +250,13 @@ export default {
     }
 
     function cleanAmountToNIO(t){
-      const base = Number(t.cantidad || 0);
-      if (!base) return 0;
-      return (t.moneda === 'USD') ? base * USD_TO_NIO_RATE : base;
+      const legacy = Number(t.cantidad || 0);
+      if (t.cantidadNIO != null) {
+        const nio = Number(t.cantidadNIO);
+        if (!Number.isNaN(nio)) return nio;
+      }
+      if (!legacy) return 0;
+      return (t.moneda === 'USD') ? legacy * USD_TO_NIO_RATE : legacy;
     }
 
     function applyClientFilters(docs){
@@ -309,7 +313,7 @@ export default {
     function computeTotals(list){
       let inSum = 0, outSum = 0;
       for (const t of list){
-        const nio = cleanAmountToNIO(t);
+        const nio = Number(t.cantidadNIO || 0);
         if (t.tipo === 'in') inSum += nio;
         else if (t.tipo === 'out') outSum += nio;
       }
