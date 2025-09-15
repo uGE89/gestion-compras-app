@@ -19,6 +19,6 @@ export const registry = {
   'cotizaciones_detalles' : () => import('../apps/cotizaciones_detalles.app.js'),
   'cotizaciones_editar'   : () => import('../apps/cotizaciones_editar.app.js'),
   'conciliacion'          : () => import('../apps/conciliacion.app.js'),
-  'jefe_caja'             : () => import('../public/apps/jefe_caja.app.js'),
+  'jefe_caja'             : () => import('../apps/jefe_caja.app.js'),
 
 };
