@@ -88,11 +88,14 @@
     import { appState, hydrateDrafts, savePedidoDraft, saveCotizacionDraft, KEYS } from './state.js';
     import { auth, db as firestoreDb, storage as firebaseStorage } from './firebase-init.js';
     import { FIREBASE_BASE, PDFJS_CDN } from './apps/lib/constants.js';
-    import { onAuthStateChanged, signOut } from `${FIREBASE_BASE}firebase-auth.js`;
     import { loadContent } from './app_loader.js';
     import { createRouter } from './framework/router-lite.js';
     import { registry } from './framework/registry.js';
     import { env } from './env.js';
+
+
+    const { onAuthStateChanged, signOut } =
+      await import(`${FIREBASE_BASE}firebase-auth.js`);
 
 
 
