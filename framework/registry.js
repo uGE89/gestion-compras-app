@@ -7,6 +7,7 @@ export const registry = {
   'caja_detalle': () => import('../apps/caja_detalle.app.js'),
   'caja_editar':  () => import('../apps/caja_editar.app.js'),
   'caja_registrar': () => import('../apps/caja_registrar.app.js'),
+  'caja_transferir': () => import('../apps/caja_transferir.app.js'),
   'compras_historial': () => import('../apps/compras_historial.app.js'),
   'compras_registrar': () => import('../apps/compras_registrar.app.js'),
   'compras_detalles': () => import('../apps/compras_detalles.app.js'),
