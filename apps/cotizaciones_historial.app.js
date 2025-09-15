@@ -1,11 +1,7 @@
 // apps/cotizaciones_historial.app.js
-import { FIREBASE_BASE } from './lib/constants.js';
-const {
-  collection,
-  onSnapshot,
-  query,
-  orderBy
-} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
+import {
+  collection, onSnapshot, query, orderBy
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 const COT_COLLECTION = 'cotizaciones_analizadas';
 
 

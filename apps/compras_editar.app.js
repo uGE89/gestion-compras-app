@@ -1,22 +1,12 @@
 // apps/compras_editar.app.js
-import { FIREBASE_BASE, PDFJS_CDN } from './lib/constants.js';
 import {
-  collection,
-  doc,
-  getDoc,
-  updateDoc,
-  query,
-  where,
-  getDocs,
-  serverTimestamp
-} from `${FIREBASE_BASE}firebase-firestore.js`;
+  collection, doc, getDoc, updateDoc,
+  query, where, getDocs, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL }
-  from `${FIREBASE_BASE}firebase-storage.js`;
+  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 import { ItemsEditor } from './components/items_editor.js';
 import { persistMappingsForItems } from './lib/associations.js';
-import { showToast } from './lib/toast.js';
-import { parseNumber } from '../export_utils.js';
-import { DEFAULT_EXCHANGE_RATE } from '../constants.js';
 
 const MAP_COLLECTION = 'mapeo_articulos';
 
@@ -40,6 +30,18 @@ export default {
 
     // ===== Utils =====
     const $  = (sel, root = document) => root.querySelector(sel);
+    const parseLocalFloat = (v) => (typeof v === 'number') ? v
+      : (typeof v === 'string' ? (parseFloat(v.replace(/,/g,'')) || 0) : 0);
+    function showToast(m, t='success') {
+      let tc = document.getElementById('toast-container');
+      if (!tc) { tc = document.createElement('div'); tc.id='toast-container'; tc.className='fixed bottom-4 right-4 z-50'; document.body.appendChild(tc); }
+      const el = document.createElement('div');
+      const color = t==='success' ? 'bg-emerald-500' : 'bg-red-500';
+      el.className = `toast ${color} text-white font-bold py-3 px-5 rounded-lg shadow-xl transform translate-y-4 opacity-0 fixed bottom-4 right-4 z-50`;
+      el.textContent = m; tc.appendChild(el);
+      setTimeout(()=>{ el.classList.remove('translate-y-4','opacity-0'); }, 10);
+      setTimeout(()=>{ el.classList.add('translate-y-4','opacity-0'); el.addEventListener('transitionend',()=>el.remove()); }, 3000);
+    }
     const ymd = (s) => { const d = new Date(s); if (isNaN(d)) return ''; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
     // ===== IA directa (temporal en frontend) =====
@@ -75,11 +77,8 @@ export default {
       if (typeof pdfjsLib !== 'undefined') return;
       await new Promise((resolve, reject) => {
         const s = document.createElement('script');
-        s.src = `${PDFJS_CDN}pdf.min.js`;
-        s.onload = () => {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN}pdf.worker.min.js`;
-          resolve();
-        };
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js';
+        s.onload = () => { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js'; resolve(); };
         s.onerror = reject;
         document.head.appendChild(s);
       });
@@ -112,7 +111,7 @@ export default {
       if (!description) return null;
       const mapId = description.toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-');
       const mref = doc(db, MAP_COLLECTION, mapId);
-      const snap = await (await import(`${FIREBASE_BASE}firebase-firestore.js`)).getDoc(mref);
+      const snap = await (await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js")).getDoc(mref);
       return snap.exists() ? snap.data() : null;
     }
 
@@ -179,7 +178,7 @@ export default {
 
     // Prefill
     imageUrls      = Array.isArray(original.images) ? [...original.images] : [];
-    totalFacturaAI = parseNumber(original.total) || 0;
+    totalFacturaAI = parseLocalFloat(original.total) || 0;
 
     $('#fecha', root).value          = ymd(original.fecha || '');
     $('#numero_factura', root).value = original.numero_factura || '';
@@ -202,13 +201,13 @@ export default {
 
     // Sincronizar cuando el usuario edite "Monto Total (Factura)"
     $('#total', root).addEventListener('input', (e) => {
-      const v = parseNumber(e.target.value);
+      const v = parseLocalFloat(e.target.value);
       totalFacturaAI = isFinite(v) && v >= 0 ? v : 0;
       itemsEditor.setInvoiceTotal(totalFacturaAI); // refleja en "Total Factura (IA)"
     });
 
     $('#total', root).addEventListener('blur', (e) => {
-      const v = parseNumber(e.target.value);
+      const v = parseLocalFloat(e.target.value);
       e.target.value = (isFinite(v) ? v : 0).toFixed(2);
     });
 
@@ -273,7 +272,7 @@ export default {
           if (aiData.fecha)           $('#fecha', root).value = aiData.fecha;
           if (aiData.proveedor)       $('#proveedor', root).value = aiData.proveedor;
           if (aiData.numero_factura)  $('#numero_factura', root).value = aiData.numero_factura;
-          const aiTotal = parseNumber(aiData.total) || 0;
+          const aiTotal = parseLocalFloat(aiData.total) || 0;
           if (aiTotal) { totalFacturaAI = aiTotal; $('#total', root).value = aiTotal.toFixed(2); itemsEditor.setInvoiceTotal(aiTotal); }
 
           aiLoaderText.textContent = 'Mapeando artículos...';
@@ -281,9 +280,9 @@ export default {
             const assoc = await findAssociation(it.descripcion);
             return {
               descripcion_factura: it.descripcion,
-              cantidad_factura: parseNumber(it.cantidad),
+              cantidad_factura: parseLocalFloat(it.cantidad),
               unidades_por_paquete: 1,
-              total_linea_base: parseNumber(it.total_linea),
+              total_linea_base: parseLocalFloat(it.total_linea),
               clave_proveedor: it.clave_proveedor || null,
               clave_catalogo: assoc ? assoc.clave_catalogo : null,
               desc_catalogo: assoc ? assoc.desc_catalogo : null,
@@ -341,7 +340,7 @@ export default {
       }
 
       const ivaPercent = parseFloat($('#ie-iva', root)?.value || '0');
-      const tipoCambio = parseNumber($('#ie-tc', root)?.value || DEFAULT_EXCHANGE_RATE);
+      const tipoCambio = parseFloat($('#ie-tc', root)?.value || '1');
       const ivaFactor  = 1 + (ivaPercent / 100);
 
       // Ítems desde el editor
@@ -372,7 +371,7 @@ export default {
         });
       })();
 
-      totalFacturaAI = parseNumber($('#total', root).value);
+      totalFacturaAI = parseLocalFloat($('#total', root).value);
 
       const patch = {
         fecha: $('#fecha', root).value,

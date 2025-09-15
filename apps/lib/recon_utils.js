@@ -231,4 +231,3 @@ export function autoHeaderObjects(matrixOrRows) {
   const body = M.slice(hIdx + 1).map(r => indices.map(i => r[i]));
   return body.map(r => Object.fromEntries(header.map((h, i) => [h, r[i] ?? ''])));
 }
-

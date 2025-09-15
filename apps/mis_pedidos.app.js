@@ -1,6 +1,4 @@
 // apps/mis_pedidos.app.js
-import { FIREBASE_BASE, TAILWIND_CDN } from './lib/constants.js';
-
 export default {
   async mount(container, { appState, auth, db }) {
     // === UI base ===
@@ -159,7 +157,7 @@ export default {
     async function loadSavedOrders() {
       if (!currentUser) return;
       const { collection, getDocs, query, where } = await import(
-        `${FIREBASE_BASE}firebase-firestore.js`
+        'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js'
       );
       const q = query(collection(db, 'pedidos'), where('userId', '==', currentUser.uid));
       const snap = await getDocs(q);
@@ -169,7 +167,7 @@ export default {
 
     async function openOrder(orderId) {
       const { doc, getDoc } = await import(
-        `${FIREBASE_BASE}firebase-firestore.js`
+        'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js'
       );
       const snap = await getDoc(doc(db, 'pedidos', orderId));
       if (!snap.exists()) {
@@ -181,7 +179,7 @@ export default {
 
     async function printOrder(orderId) {
       const { doc, getDoc } = await import(
-        `${FIREBASE_BASE}firebase-firestore.js`
+        'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js'
       );
       const snap = await getDoc(doc(db, 'pedidos', orderId));
       if (!snap.exists()) {
@@ -209,7 +207,7 @@ export default {
         <html lang="es">
           <head>
             <title>Pedido ${orderId.slice(0,6)}</title>
-            <script src="${TAILWIND_CDN}"><\/script>
+            <script src="https://cdn.tailwindcss.com"><\/script>
             <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
             <style>
               body { font-family: 'Inter', sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }

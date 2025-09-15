@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registro de Movimientos</title>
-    <script type="module" src="./tailwind-loader.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <style>
 .step {
@@ -136,24 +136,15 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity
     
     <script type="module">
     import { auth, db, storage, firebaseConfig } from './firebase-init.js';
-    import { FIREBASE_BASE, PDFJS_CDN } from './apps/lib/constants.js';
-    const { onAuthStateChanged, signInAnonymously } = await import(`${FIREBASE_BASE}firebase-auth.js`);
-    const {
-      collection,
-      addDoc,
-      serverTimestamp,
-      getDocs,
-      query,
-      where,
-    } = await import(`${FIREBASE_BASE}firebase-firestore.js`);
-    const { ref, uploadBytes, getDownloadURL } = await import(`${FIREBASE_BASE}firebase-storage.js`);
-    import { toNio } from './export_utils.js';
-    import { showToast } from './apps/lib/toast.js';
+    import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { collection, addDoc, serverTimestamp, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
     // --- 1. ESTADO Y CONSTANTES GLOBALES ---
     let userId = null, currentImageUrl = null;
     let alegraContactsCache = [], alegraCategoriesCache = [];
     let isDataUnsaved = false; //
+    const USD_TO_NIO_RATE = 36.6;
     const accountMappingsArray = [
                         { id: 5, name: "Ahorro Dólares CEF", color: "#388E3C", moneda: "USD" },
                         { id: 4, name: "Ahorro Dólares EFV", color: "#388E3C", moneda: "USD" },
@@ -709,7 +700,7 @@ function resetUI() {
             createdAt: serverTimestamp(),
         };
         transferData.cantidadNIO = transferData.moneda === 'USD' 
-            ? toNio(transferData.cantidad, transferData.moneda)
+            ? transferData.cantidad * USD_TO_NIO_RATE 
             : transferData.cantidad;
         
         return transferData;
@@ -974,7 +965,7 @@ Si **NO** es un estado de cuenta con columnas (comprobantes, tickets, vouchers, 
     }
     
     async function renderPdfToImage(file) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN}pdf.worker.min.js`;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
         const fileReader = new FileReader();
         return new Promise((resolve, reject) => {
             fileReader.onload = async function() {
@@ -1062,6 +1053,15 @@ async function checkConfirmationExists(number) {
         return isNaN(n) ? null : n;
     }
     
+    function showToast(message, type = 'info') {
+        const t = document.createElement('div');
+        const c = { info: 'bg-sky-600', success: 'bg-emerald-600', warning: 'bg-amber-500', error: 'bg-red-600' };
+        t.className = `p-4 rounded-lg shadow-xl text-white font-semibold animate-pulse ${c[type]}`;
+        t.textContent = message;
+        document.getElementById('toast-container').appendChild(t);
+        setTimeout(() => t.remove(), 4000);
+    }
+
         function fileToBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = event => resolve(event.target.result); reader.onerror = error => reject(error); reader.readAsDataURL(file); }); }
 
 // Normaliza para buscar (sin acentos, minúsculas)

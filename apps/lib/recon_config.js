@@ -14,4 +14,3 @@ export function tolerance(nioAmountFromBank) {
 export function buildStorageKey({ cuentaId, desdeISO, hastaISO }) {
   return `conciliacion:${cuentaId}:${desdeISO || 'na'}:${hastaISO || 'na'}`;
 }
-

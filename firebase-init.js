@@ -1,9 +1,8 @@
-import { FIREBASE_BASE } from './apps/lib/constants.js';
-const { initializeApp } = await import(`${FIREBASE_BASE}firebase-app.js`);
-const { getAuth } = await import(`${FIREBASE_BASE}firebase-auth.js`);
-const { getFirestore } = await import(`${FIREBASE_BASE}firebase-firestore.js`);
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 // ✅ AÑADIDO: Importa la función para Storage
-const { getStorage } = await import(`${FIREBASE_BASE}firebase-storage.js`);
+import { getStorage } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 export const firebaseConfig = {
     apiKey: "AIzaSyCPeJ-uaDBJfX6wmEZc2EV8hgzq7Z_Gw4o",

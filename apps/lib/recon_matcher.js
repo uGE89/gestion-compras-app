@@ -148,4 +148,3 @@ function rankScore(x) {
   const k = x.group.length;
   return t*1e6 + e*1e3 + lag*10 + k; // prioridad: tier, error, lag, tamaño
 }
-

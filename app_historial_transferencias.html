@@ -74,24 +74,8 @@
 
 <script type="module">
     import { auth, db } from './firebase-init.js';
-    import { FIREBASE_BASE } from './apps/lib/constants.js';
-    const { onAuthStateChanged } = await import(`${FIREBASE_BASE}firebase-auth.js`);
-    const {
-      collection,
-      onSnapshot,
-      doc,
-      deleteDoc,
-      query,
-      orderBy,
-      serverTimestamp,
-      getDoc,
-      updateDoc,
-      where,
-      getDocs,
-      addDoc,
-    } = await import(`${FIREBASE_BASE}firebase-firestore.js`);
-    import { toNio } from './export_utils.js';
-    import { showToast } from './apps/lib/toast.js';
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { collection, onSnapshot, doc, deleteDoc, query, orderBy, serverTimestamp, getDoc, updateDoc, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     function initHistoryApp() {
         const transfersCollection = collection(db, 'transferencias');
@@ -102,6 +86,7 @@
         let alegraContactsCache = [];
         let alegraCategoriesCache = [];
         let allTransfers = [];
+        const USD_TO_NIO_RATE = 36.6;
                     const accountMappingsArray = [
                         { id: 5, name: "Ahorro Dólares CEF", color: "#388E3C", moneda: "USD" },
                         { id: 4, name: "Ahorro Dólares EFV", color: "#388E3C", moneda: "USD" },
@@ -203,7 +188,7 @@
                     updatedAt: serverTimestamp(),
                     userId: userId,
                 };
-                transferData.cantidadNIO = toNio(transferData.cantidad, transferData.moneda);
+                transferData.cantidadNIO = transferData.moneda === 'USD' ? transferData.cantidad * USD_TO_NIO_RATE : transferData.cantidad;
                 
                 const docRef = doc(db, transfersCollection.path, docId);
                 const isInternal = form.querySelector('#internal-transfer-toggle')?.checked;
@@ -284,7 +269,7 @@
                     const editButtonIcon = hasMirror ? 'visibility' : 'edit';
                     const editButtonClass = hasMirror ? 'view-btn bg-sky-100 hover:bg-sky-200 text-sky-800' : 'edit-btn bg-blue-100 hover:bg-blue-200 text-blue-800';
                     const formattedDate = t.fecha ? new Date(t.fecha + 'T00:00:00').toLocaleDateString('es-ES') : 'N/A';
-                    const nioAmount = toNio(t.cantidad || 0, t.moneda);
+                    const nioAmount = t.moneda === 'USD' ? (t.cantidad || 0) * USD_TO_NIO_RATE : (t.cantidad || 0);
                     const amountHtml = t.moneda === 'USD' ? `<span class="font-bold ${typeColor}">${(t.cantidad || 0).toFixed(2)} USD (C$${nioAmount.toFixed(2)})</span>` : `<span class="font-bold ${typeColor}">C$${nioAmount.toFixed(2)}</span>`;
                     
                     let extraInfoHtml = '';
@@ -500,6 +485,15 @@
             `;
         }
         
+        function showToast(message, type = 'info') { 
+            const toast = document.createElement('div');
+            const colors = { info: 'bg-sky-500', success: 'bg-emerald-500', error: 'bg-red-500' };
+            toast.className = `fixed bottom-4 right-4 z-50 ${colors[type]} text-white font-bold py-3 px-5 rounded-lg shadow-xl`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
         function cleanAmount(amount) {
             if (amount === null || amount === undefined) return null;
             let amountStr = String(amount).replace(/[^\d,.]/g, '');

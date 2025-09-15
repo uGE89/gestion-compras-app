@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temporizador de Ciclos con Sonido</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Importación de Tone.js para el sonido -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 flex items-center justify-center min-h-screen">
+    <div class="text-center p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full">
+        <!-- Título y botón de silencio -->
+        <div class="flex justify-between items-center mb-2">
+             <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Temporizador de Ciclos</h1>
+             <button id="muteButton" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none">
+                <svg id="unmutedIcon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-600 dark:text-gray-300"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                <svg id="mutedIcon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden text-gray-600 dark:text-gray-300"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+             </button>
+        </div>
+       
+        <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4">Ronda: <span id="roundCounter">1</span></h2>
+        
+        <!-- Círculo del temporizador -->
+        <div id="timer-container" class="relative w-48 h-48 mx-auto mb-6 flex items-center justify-center bg-gray-200 dark:bg-gray-700 rounded-full border-4 border-transparent">
+            <div id="timer" class="text-6xl font-bold text-gray-900 dark:text-gray-100">30</div>
+        </div>
+        
+        <!-- Mensaje de estado -->
+        <div id="message" class="text-lg text-gray-600 dark:text-gray-300 h-12 flex items-center justify-center">
+            <p>Presiona Iniciar para comenzar</p>
+        </div>
+        
+        <!-- Botones de control -->
+        <div class="flex justify-center space-x-4 mt-6">
+            <button id="startButton" class="px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition-transform transform hover:scale-105">
+                Iniciar
+            </button>
+            <button id="resetButton" class="px-8 py-3 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75 transition-transform transform hover:scale-105" disabled>
+                Reiniciar
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- Elementos del DOM ---
+        const timerElement = document.getElementById('timer');
+        const messageElement = document.getElementById('message').querySelector('p');
+        const startButton = document.getElementById('startButton');
+        const resetButton = document.getElementById('resetButton');
+        const roundCounterElement = document.getElementById('roundCounter');
+        const timerContainer = document.getElementById('timer-container');
+        const muteButton = document.getElementById('muteButton');
+        const unmutedIcon = document.getElementById('unmutedIcon');
+        const mutedIcon = document.getElementById('mutedIcon');
+
+        // --- Variables de estado ---
+        const workTime = 30;
+        const restTime = 5;
+        let timeLeft = workTime;
+        let round = 1;
+        let timerInterval = null;
+        let isRunning = false;
+        let isMuted = false;
+        let currentState = 'work'; // Puede ser 'work' o 'rest'
+
+        // --- Configuración de Sonido (Tone.js) ---
+        const synth = new Tone.Synth().toDestination();
+
+        function playWorkEndSound() {
+            if (!isMuted) {
+                synth.triggerAttackRelease("C5", "8n"); // Tono más alto para fin de trabajo
+            }
+        }
+        function playRestEndSound() {
+            if (!isMuted) {
+                synth.triggerAttackRelease("G4", "8n"); // Tono más bajo para fin de descanso
+            }
+        }
+        
+        /**
+         * Actualiza la pantalla del temporizador.
+         */
+        function updateDisplay() {
+            timerElement.textContent = timeLeft < 10 ? `0${timeLeft}` : timeLeft;
+        }
+
+        /**
+         * Inicia el bucle principal del temporizador.
+         */
+        function startTimer() {
+            if (isRunning) return;
+            isRunning = true;
+            
+            startButton.disabled = true;
+            resetButton.disabled = false;
+
+            // Inicia el contexto de audio al interactuar el usuario
+            if (Tone.context.state !== 'running') {
+                Tone.start();
+            }
+            
+            tick(); 
+            timerInterval = setInterval(tick, 1000);
+        }
+
+        /**
+         * La función que se ejecuta cada segundo.
+         */
+        function tick() {
+            timeLeft--;
+            updateDisplay();
+
+            if (timeLeft < 0) {
+                if (currentState === 'work') {
+                    playWorkEndSound();
+                    // Transición de trabajo a descanso
+                    currentState = 'rest';
+                    timeLeft = restTime;
+                    messageElement.textContent = 'Descanso';
+                    timerContainer.classList.remove('border-blue-500');
+                    timerContainer.classList.add('border-green-500');
+                } else if (currentState === 'rest') {
+                    playRestEndSound();
+                    // Transición de descanso a trabajo (nueva ronda)
+                    currentState = 'work';
+                    timeLeft = workTime;
+                    round++;
+                    roundCounterElement.textContent = round;
+                    messageElement.textContent = 'Trabajo';
+                    timerContainer.classList.remove('border-green-500');
+                    timerContainer.classList.add('border-blue-500');
+                }
+                updateDisplay(); // Actualiza la pantalla inmediatamente después del cambio
+            }
+        }
+
+        /**
+         * Reinicia el temporizador a su estado inicial.
+         */
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            currentState = 'work';
+            timeLeft = workTime;
+            round = 1;
+            updateDisplay();
+            roundCounterElement.textContent = round;
+            messageElement.textContent = 'Presiona Iniciar para comenzar';
+            startButton.disabled = false;
+            resetButton.disabled = true;
+            timerContainer.classList.remove('border-blue-500', 'border-green-500');
+        }
+
+        // --- Event Listeners ---
+        startButton.addEventListener('click', () => {
+            if (!isRunning) {
+                messageElement.textContent = 'Trabajo';
+                timerContainer.classList.add('border-blue-500');
+                startTimer();
+            }
+        });
+
+        resetButton.addEventListener('click', resetTimer);
+
+        muteButton.addEventListener('click', () => {
+            isMuted = !isMuted;
+            unmutedIcon.classList.toggle('hidden');
+            mutedIcon.classList.toggle('hidden');
+        });
+
+        // --- Inicialización ---
+        updateDisplay(); 
+    </script>
+</body>
+</html>

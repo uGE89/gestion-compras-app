@@ -1,12 +1,9 @@
 // apps/components/items_editor.js
-import { parseNumber } from '../../export_utils.js';
-import { DEFAULT_EXCHANGE_RATE } from '../../constants.js';
-
 export function ItemsEditor({
   container,
   productCatalog = [],
   initialIVA = 15,
-  initialTC = DEFAULT_EXCHANGE_RATE,
+  initialTC = 1,
   initialTotalAI = 0,
   onChange = () => {}
 }) {
@@ -19,6 +16,12 @@ export function ItemsEditor({
   // ===== Utils =====
   const $  = (sel, root=container) => root.querySelector(sel);
   const $$ = (sel, root=container) => Array.from(root.querySelectorAll(sel));
+
+  const parseLocalFloat = (v) => {
+    if (typeof v === 'number') return v;
+    if (typeof v !== 'string') return 0;
+    return parseFloat(v.replace(/,/g, '')) || 0;
+  };
 
   const cur = n => `$${(Number(n)||0).toLocaleString('en-US',{ minimumFractionDigits:2, maximumFractionDigits:2 })}`;
 
@@ -111,8 +114,8 @@ export function ItemsEditor({
   `;
 
   // ===== Listeners raíz =====
-  $('#ie-iva').addEventListener('input', () => { IVA = parseNumber($('#ie-iva').value); renderSummary(); patchAllComputed(); onChange(getItems()); });
-  $('#ie-tc').addEventListener('input',  () => { TC  = parseNumber($('#ie-tc').value);  renderSummary(); patchAllComputed(); onChange(getItems()); });
+  $('#ie-iva').addEventListener('input', () => { IVA = parseLocalFloat($('#ie-iva').value); renderSummary(); patchAllComputed(); onChange(getItems()); });
+  $('#ie-tc').addEventListener('input',  () => { TC  = parseLocalFloat($('#ie-tc').value);  renderSummary(); patchAllComputed(); onChange(getItems()); });
   $('#ie-add-item').addEventListener('click', addItem);
 
   // Cerrar resultados al hacer click fuera
@@ -316,7 +319,7 @@ export function ItemsEditor({
         const field = inp.dataset.field;
         let val = inp.value;
         if (['cantidad_factura','unidades_por_paquete','total_linea_base'].includes(field)) {
-          val = parseNumber(val);
+          val = parseLocalFloat(val);
         }
         items[idx][field] = val;
         patchComputedRow(idx);

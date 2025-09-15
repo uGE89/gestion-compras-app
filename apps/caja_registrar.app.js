@@ -1,19 +1,11 @@
 // /public/apps/caja_registrar.app.js
 // Registrar movimientos de caja (usa colección 'transferencias')
 import { auth, db, storage, firebaseConfig } from '../firebase-init.js';
-import { FIREBASE_BASE, PDFJS_CDN } from './lib/constants.js';
-const { onAuthStateChanged, signInAnonymously } = await import(`${FIREBASE_BASE}firebase-auth.js`);
-const {
-  collection,
-  addDoc,
-  serverTimestamp,
-  getDocs,
-  query,
-  where
-} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
-const { ref, uploadBytes, getDownloadURL } = await import(`${FIREBASE_BASE}firebase-storage.js`);
-import { toNio } from '../export_utils.js';
-import { showToast } from './lib/toast.js';
+import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import {
+  collection, addDoc, serverTimestamp, getDocs, query, where
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 export default {
   async mount(container) {
@@ -62,6 +54,7 @@ export default {
     `;
 
     // ---------- Estado ----------
+    const USD_TO_NIO_RATE = 36.6;
     const accountMappingsArray = [
       { id: 5,  name: "Ahorro Dólares CEF", color: "#388E3C", moneda: "USD" },
       { id: 4,  name: "Ahorro Dólares EFV", color: "#388E3C", moneda: "USD" },
@@ -206,13 +199,13 @@ export default {
       if (!window.pdfjsLib) {
         await new Promise((res, rej) => {
           const s = document.createElement('script');
-          s.src = `${PDFJS_CDN}pdf.min.js`;
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js';
           s.onload = res; s.onerror = rej;
           document.head.appendChild(s);
         });
       }
       window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-        `${PDFJS_CDN}pdf.worker.min.js`;
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
 
       const ab = await file.arrayBuffer();
       const pdf = await window.pdfjsLib.getDocument(new Uint8Array(ab)).promise;
@@ -513,11 +506,19 @@ export default {
         userId: userId,
         createdAt: serverTimestamp(),
       };
-      obj.cantidadNIO = toNio(obj.cantidad, obj.moneda);
+      obj.cantidadNIO = obj.moneda === 'USD' ? obj.cantidad * USD_TO_NIO_RATE : obj.cantidad;
       return obj;
     }
 
     // ---------- Utilidades ----------
+    function showToast(message, type='info') {
+      const div = document.createElement('div');
+      const colors = { info:'bg-sky-600', success:'bg-emerald-600', warning:'bg-amber-500', error:'bg-red-600' };
+      div.className = `p-4 rounded-lg shadow-xl text-white font-semibold ${colors[type]}`;
+      div.textContent = message;
+      $('#toast-container').appendChild(div);
+      setTimeout(()=>div.remove(), 3500);
+    }
     const fileToBase64 = (file) => new Promise((res, rej) => {
       const r = new FileReader(); r.onload = e => res(e.target.result); r.onerror = rej; r.readAsDataURL(file);
     });

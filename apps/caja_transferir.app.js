@@ -1,19 +1,11 @@
 // /public/apps/caja_transferir.app.js
 import { db } from '../firebase-init.js';
-import { FIREBASE_BASE } from './lib/constants.js';
-const {
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  runTransaction,
-  serverTimestamp,
-  query,
-  where,
-  getDocs,
-  updateDoc
-} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
-import { USD_TO_NIO_RATE } from '../constants.js';
+import {
+  collection, doc, getDoc, setDoc, runTransaction, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import {
+  query, where, getDocs, updateDoc
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const accountMappingsArray = [
   { id: 5,  name: "Ahorro Dólares CEF", moneda: "USD" },
@@ -32,6 +24,8 @@ const accountMappingsArray = [
   { id: 3,  name: "Tarjeta de crédito 1", moneda: "NIO" },
   { id: 15, name: "BAC córdobas", moneda: "NIO" }
 ];
+
+const USD_TO_NIO_RATE = 36.6;
 
 /* ===================== Helpers ===================== */
 function cleanAmount(amount) {
@@ -128,7 +122,7 @@ async function createTransferPair({
         alegraContactId: origenData.alegraContactId || null,
         alegraCategoryId: origenData.alegraCategoryId || null,
         imageUrl: origenData.imageUrl || imageUrl || '',
-        status: 'pending_review',
+        status: origenData.status || 'pending_review',
         userId: origenData.userId || userId || null,
         isMirror: true,
         originalTransactionId: origenRef.id,

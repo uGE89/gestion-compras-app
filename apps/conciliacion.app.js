@@ -479,4 +479,3 @@ function renderRightPanel(b, cands, ui, session, onFix) {
   }
 }
 
-

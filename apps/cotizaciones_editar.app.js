@@ -1,16 +1,9 @@
 // apps/cotizaciones_editar.app.js
-import { FIREBASE_BASE, PDFJS_CDN } from './lib/constants.js';
-const {
-  doc,
-  getDoc,
-  updateDoc,
-  serverTimestamp
-} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
+import {
+  doc, getDoc, updateDoc, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { ItemsEditor } from './components/items_editor.js';
 import { persistMappingsForItems } from './lib/associations.js';
-import { showToast } from './lib/toast.js';
-import { parseNumber } from '../export_utils.js';
-import { DEFAULT_EXCHANGE_RATE } from '../constants.js';
 const COT_COLLECTION = 'cotizaciones_analizadas';
 
 const MAP_COLLECTION = 'mapeo_articulos';
@@ -23,6 +16,18 @@ export default {
     if (!id) { container.innerHTML = '<div class="p-6 text-slate-500">ID no especificado.</div>'; return; }
 
     const $ = (s, r=document)=> r.querySelector(s);
+    const parseNum = v => (typeof v==='number')? v : (parseFloat(String(v).replace(/,/g,''))||0);
+
+    function showToast(m,t='success'){
+      let tc=document.getElementById('toast-container');
+      if(!tc){tc=document.createElement('div');tc.id='toast-container';tc.className='fixed bottom-4 right-4 z-50';document.body.appendChild(tc);}
+      const el=document.createElement('div');
+      const c=t==='success'?'bg-emerald-500':'bg-red-500';
+      el.className=`${c} text-white font-bold py-3 px-5 rounded-lg shadow-xl transform translate-y-4 opacity-0 mb-2`;
+      el.textContent=m; tc.appendChild(el);
+      setTimeout(()=>{el.classList.remove('translate-y-4','opacity-0')},10);
+      setTimeout(()=>{el.classList.add('translate-y-4','opacity-0'); el.addEventListener('transitionend',()=>el.remove())},2800);
+    }
 
     // ===== IA directa (opcional, solo para anexar) =====
     async function getAIDataDirect(base64Array, apiKey) {
@@ -47,8 +52,8 @@ export default {
       if (typeof pdfjsLib !== 'undefined') return;
       await new Promise((resolve,reject)=>{
         const s=document.createElement('script');
-        s.src=`${PDFJS_CDN}pdf.min.js`;
-        s.onload=()=>{ pdfjsLib.GlobalWorkerOptions.workerSrc=`${PDFJS_CDN}pdf.worker.min.js`; resolve(); };
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js';
+        s.onload=()=>{ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js'; resolve(); };
         s.onerror=reject; document.head.appendChild(s);
       });
     }
@@ -152,7 +157,7 @@ const itemsEditor = ItemsEditor({
   container: $('#calc', root),
   productCatalog,
   initialIVA: Number(data.iva_aplicado ?? 0),
-  initialTC: Number(data.tipo_cambio_aplicado ?? DEFAULT_EXCHANGE_RATE),
+  initialTC: Number(data.tipo_cambio_aplicado ?? 1),
   initialTotalAI: Number(data.total || 0),
   onChange: () => {}
 });
@@ -190,7 +195,7 @@ itemsEditor.setInvoiceTotal(Number(data.total || 0));
           if (extracted.proveedor) $('#proveedor', root).value = extracted.proveedor;
           if (extracted.numero_cotizacion) $('#folio', root).value = extracted.numero_cotizacion;
 
-          const totalDoc = parseNumber(extracted.total);
+          const totalDoc = parseNum(extracted.total);
           if (totalDoc>0) { $('#total', root).value = totalDoc.toFixed(2); itemsEditor.setInvoiceTotal(totalDoc); }
 
           // anexa ítems + mapeo
@@ -198,9 +203,9 @@ itemsEditor.setInvoiceTotal(Number(data.total || 0));
             const assoc = await findAssociation(it.descripcion);
             return {
               descripcion_factura: it.descripcion,
-              cantidad_factura: parseNumber(it.cantidad),
+              cantidad_factura: parseNum(it.cantidad),
               unidades_por_paquete: 1,
-              total_linea_base: parseNumber(it.total_linea),
+              total_linea_base: parseNum(it.total_linea),
               clave_proveedor: it.clave_proveedor || null,
               clave_catalogo: assoc ? assoc.clave_catalogo : null,
               desc_catalogo: assoc ? assoc.desc_catalogo : null,

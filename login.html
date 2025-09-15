@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Iniciar Sesión</title>
-    <script type="module" src="./tailwind-loader.js"></script>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
@@ -72,9 +73,8 @@
     // --- Importaciones ---
     // Importa el servicio 'auth' ya inicializado desde el archivo central.
     import { auth } from './firebase-init.js';
-    import { FIREBASE_BASE } from './apps/lib/constants.js';
     // Importa las funciones específicas de autenticación que usarás en esta página.
-    const { onAuthStateChanged, signInWithEmailAndPassword } = await import(`${FIREBASE_BASE}firebase-auth.js`);
+    import { onAuthStateChanged, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
     // --- ELEMENTOS DEL DOM ---
     const loginForm = document.getElementById('login-form');

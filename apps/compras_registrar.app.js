@@ -1,20 +1,12 @@
 // apps/compras_registrar.app.js
-import { FIREBASE_BASE, PDFJS_CDN } from './lib/constants.js';
-const {
-  collection,
-  addDoc,
-  query,
-  where,
-  getDocs,
+import {
+  collection, addDoc, query, where, getDocs,
   serverTimestamp
-} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
-const { ref, uploadBytes, getDownloadURL }
-  = await import(`${FIREBASE_BASE}firebase-storage.js`);
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { ref, uploadBytes, getDownloadURL }
+  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 import { ItemsEditor } from './components/items_editor.js';
 import { associateItemsBatch, persistMappingsForItems } from './lib/associations.js';
-import { showToast } from './lib/toast.js';
-import { parseNumber } from '../export_utils.js';
-import { DEFAULT_EXCHANGE_RATE } from '../constants.js';
 
 
 
@@ -29,6 +21,19 @@ export default {
 
     // ===== Utils =====
     const $  = (sel, root=document) => root.querySelector(sel);
+    const parseLocalFloat = (v) => (typeof v === 'number') ? v :
+      (typeof v === 'string' ? (parseFloat(v.replace(/,/g,'')) || 0) : 0);
+
+    function showToast(m,t='success'){
+      let tc = document.getElementById('toast-container');
+      if (!tc) { tc = document.createElement('div'); tc.id='toast-container'; tc.className='fixed bottom-4 right-4 z-50'; document.body.appendChild(tc); }
+      const el=document.createElement('div');
+      const color = t==='success'?'bg-emerald-500':'bg-red-500';
+      el.className = `toast ${color} text-white font-bold py-3 px-5 rounded-lg shadow-xl transform translate-y-4 opacity-0 fixed bottom-4 right-4 z-50`;
+      el.textContent = m; tc.appendChild(el);
+      setTimeout(()=>{el.classList.remove('translate-y-4','opacity-0')},10);
+      setTimeout(()=>{el.classList.add('translate-y-4','opacity-0'); el.addEventListener('transitionend',()=>el.remove())},3000);
+    }
 
     // ===== IA directa (temporal en frontend) =====
     async function getAIDataDirect(base64Array, apiKey) {
@@ -66,11 +71,8 @@ export default {
       if (typeof pdfjsLib !== 'undefined') return;
       await new Promise((resolve, reject)=>{
         const s=document.createElement('script');
-        s.src = `${PDFJS_CDN}pdf.min.js`;
-        s.onload = () => {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN}pdf.worker.min.js`;
-          resolve();
-        };
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js';
+        s.onload=()=>{ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js'; resolve(); };
         s.onerror=reject; document.head.appendChild(s);
       });
     }
@@ -172,7 +174,7 @@ export default {
       container: calcContainer,
       productCatalog,
       initialIVA: 15,
-      initialTC: DEFAULT_EXCHANGE_RATE,
+      initialTC: 1,
       initialTotalAI: 0,
       onChange: () => {}
     });
@@ -180,7 +182,7 @@ export default {
     // Sincroniza el total escrito a mano con el editor (diferencias/summary)
     const totalInput = $('#total', root);
     totalInput.addEventListener('input', () => {
-      const v = parseNumber(totalInput.value);
+      const v = parseLocalFloat(totalInput.value);
       totalFacturaAI = v;
       itemsEditor.setInvoiceTotal(v); // actualiza "Total Factura (IA)" y recalcula diferencias
     });
@@ -233,7 +235,7 @@ export default {
         const extracted = await getAIDataDirect(base64ForAI, env?.AI_API_KEY);
 
         if (extracted) {
-          totalFacturaAI = parseNumber(extracted.total) || 0;
+          totalFacturaAI = parseLocalFloat(extracted.total) || 0;
           $('#fecha', root).value = extracted.fecha || '';
           $('#proveedor', root).value = extracted.proveedor || '';
           $('#numero_factura', root).value = extracted.numero_factura || '';
@@ -244,9 +246,9 @@ export default {
 
           const baseItems = (extracted.items || []).map(it => ({
             descripcion_factura: it.descripcion,
-            cantidad_factura: parseNumber(it.cantidad),
+            cantidad_factura: parseLocalFloat(it.cantidad),
             unidades_por_paquete: 1,
-            total_linea_base: parseNumber(it.total_linea),
+            total_linea_base: parseLocalFloat(it.total_linea),
             clave_proveedor: it.clave_proveedor || null,
             recibido: false
           }));
@@ -303,10 +305,10 @@ export default {
       }
 
       const ivaPercent = parseFloat($('#ie-iva', root)?.value || '0');
-      const tipoCambio = parseNumber($('#ie-tc', root)?.value || DEFAULT_EXCHANGE_RATE);
+      const tipoCambio = parseFloat($('#ie-tc', root)?.value || '1');
 
       // Asegura el total a partir del input
-      totalFacturaAI = parseNumber($('#total', root).value);
+      totalFacturaAI = parseLocalFloat($('#total', root).value);
 
       // Final items desde el editor
       const rawItems = itemsEditor.getItems();

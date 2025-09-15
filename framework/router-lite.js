@@ -1,99 +1,67 @@
 // framework/router-lite.js
-export function createRouter({ container, registry, deps, fallbackLoadContent, soloApp }) {
-  let current = null;
-  let soloActive = false;
+export function createRouter({ container, registry, deps = {}, fallbackLoadContent }) {
+  let currentApp = null;
+
+  // Helper para las apps (y para uso externo si lo necesitas)
+  const navigate = (path, query = {}) => {
+    const qs = new URLSearchParams(query).toString();
+    location.hash = `#/${path}${qs ? `?${qs}` : ''}`;
+  };
 
   function parseRoute(route) {
-    const hash = route?.startsWith('#') ? route : `#${route || ''}`;
+    const hash = typeof route === 'string' && route ? route : (location.hash || '#/compras_historial');
+    const raw = hash.replace(/^#\/?/, '');          // "#/x?y" -> "x?y"
+    const [pathRaw, qs] = raw.split('?');
+    const path = (pathRaw || '').replace(/\/+$/, ''); // quita "/" al final
+    const params = new URLSearchParams(qs || '');
+    return { path, params };
+  }
 
-    // Separa path y query
-    const [rawPath, queryString] = hash.split('?');
-    const params = new URLSearchParams(queryString || '');
+  function getLoader(key) {
+    if (!key) return null;
+    // Soporta Map-like y objeto plano
+    if (registry?.has && registry?.get) return registry.has(key) ? registry.get(key) : null;
+    if (registry && typeof registry === 'object') {
+      const f = registry[key];
+      return (typeof f === 'function') ? f : null;
+    }
+    return null;
+  }
 
-    // Limpia: quita "#/" o "#", barra final y normaliza a minúsculas
-    let cleanPath = rawPath.replace(/^#\/?/, ''); // "#/detalles" -> "detalles"
-    cleanPath = cleanPath.replace(/\/+$/, '');    // "detalles/" -> "detalles"
-    cleanPath = cleanPath || '';                  // "" si estaba vacío
-    cleanPath = cleanPath.toLowerCase();          // consistentemente en minúsculas
-
-    return { cleanPath, params };
+  async function unmount() {
+    try { await currentApp?.unmount?.(); } catch {}
+    currentApp = null;
   }
 
   async function mount(route) {
-    const { cleanPath, params } = parseRoute(route || location.hash || '#/creador-pedido');
+    const { path, params } = parseRoute(route);
 
-    let targetPath = cleanPath;
+    await unmount();
+    container.innerHTML = '<div class="text-center py-10 text-slate-500">Cargando…</div>';
 
-    if (soloApp) {
-      const flagParam = soloApp.flagParam || 'solo';
-      const flagValue = soloApp.flagValue || '1';
-      const appParam = soloApp.appParam || 'app';
-      const wantsSolo = params.get(flagParam) === flagValue;
-      const requestedApp = params.get(appParam);
-      const shouldForceSolo = wantsSolo && requestedApp === soloApp.id;
+    const loader = getLoader(path);
+    if (loader) {
+      try {
+        const mod = await loader();
+        const app = mod?.default ?? mod;
+        if (typeof app?.mount !== 'function') throw new Error('App inválida: falta mount()');
 
-      if (shouldForceSolo) {
-        targetPath = soloApp.id;
-        if (!soloActive) {
-          soloApp.onEnter?.({ params });
-        }
-        soloActive = true;
-        const queryString = params.toString();
-        const expectedHash = `#/${soloApp.id}${queryString ? `?${queryString}` : ''}`;
-        if (typeof window !== 'undefined' && typeof window.location !== 'undefined' && window.location.hash !== expectedHash) {
-          if (typeof history !== 'undefined' && history.replaceState) {
-            history.replaceState(null, '', expectedHash);
-          } else {
-            window.location.hash = expectedHash;
-          }
-        }
-      } else if (soloActive) {
-        soloApp.onExit?.({ params });
-        soloActive = false;
+        currentApp = app;
+        await app.mount(container, { ...deps, params, navigate });
+        return;
+      } catch (err) {
+        console.error('[router-lite] error montando app', err);
       }
     }
 
-    // Desmontar app actual
-    if (current?.unmount) {
-      try { current.unmount(); } catch {}
-    }
-    container.innerHTML = '<div class="text-center py-10">Cargando…</div>';
-
-    // 1) Intentar micro-app registrada
-    let loader = registry[targetPath];
-
-    // 2) Fallback: si piden un .html, delega al app_loader
-    if (!loader) {
-      const looksHtml = targetPath.endsWith('.html');
-      if (fallbackLoadContent) {
-        container.innerHTML = '';
-        // reconstruye ruta original del .html (sin hash)
-        const filename = looksHtml ? targetPath : 'fallback.html';
-        return fallbackLoadContent(filename);
-      }
-
-      container.innerHTML = `<div class="text-center text-red-500 py-10">
-        Ruta desconocida: <code>${targetPath || '(vacía)'}</code>
-      </div>`;
-      return;
-    }
-
-    try {
-      const mod = await loader();
-      const app = mod.default || mod;
-      if (!app?.mount) throw new Error('App inválida: falta mount()');
-      current = app;
-      await app.mount(container, { ...deps, params });
-    } catch (err) {
-      console.error('[router-lite] error montando app', err);
-      if (fallbackLoadContent) {
-        container.innerHTML = '';
-        await fallbackLoadContent('fallback.html');
-      } else {
-        container.innerHTML = '<div class="text-center text-red-500 py-10">Error cargando app.</div>';
-      }
+    // Fallback si la ruta no existe o falló el import
+    if (typeof fallbackLoadContent === 'function') {
+      container.innerHTML = '';
+      await fallbackLoadContent('fallback.html');
+    } else {
+      container.innerHTML = '<div class="text-center text-slate-500 p-8">Página no encontrada.</div>';
     }
   }
 
-  return { mount };
+  return { mount, navigate };
 }

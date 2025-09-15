@@ -3,12 +3,13 @@ export const registry = {
   'creador_pedido': () => import('../apps/creador_pedido.app.js'),
   'detalles': () => import('../apps/detalles_articulo.app.js'),
   'mis_pedidos': () => import('../apps/mis_pedidos.app.js'),
-  'caja_chica_historial': () => import('../apps/caja_chica_historial.app.js'),
   'caja_historial': () => import('../apps/caja_historial.app.js'),
   'caja_detalle': () => import('../apps/caja_detalle.app.js'),
   'caja_editar':  () => import('../apps/caja_editar.app.js'),
+  'caja_formulario': () => import('../apps/caja_formulario.app.js'),
   'caja_registrar': () => import('../apps/caja_registrar.app.js'),
   'caja_transferir': () => import('../apps/caja_transferir.app.js'),
+  'caja_chica_historial': () => import('../apps/caja_chica_historial.app.js'),
   'compras_historial': () => import('../apps/compras_historial.app.js'),
   'compras_registrar': () => import('../apps/compras_registrar.app.js'),
   'compras_detalles': () => import('../apps/compras_detalles.app.js'),
@@ -19,6 +20,5 @@ export const registry = {
   'cotizaciones_detalles' : () => import('../apps/cotizaciones_detalles.app.js'),
   'cotizaciones_editar'   : () => import('../apps/cotizaciones_editar.app.js'),
   'conciliacion'          : () => import('../apps/conciliacion.app.js'),
-  'jefe_caja'             : () => import('../public/apps/jefe_caja.app.js'),
 
 };

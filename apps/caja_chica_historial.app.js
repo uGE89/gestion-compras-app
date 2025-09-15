@@ -2,26 +2,12 @@
 // Historial de Caja Chica (filtrado a una cuenta fija) + totales por filtros
 
 import { auth, db } from '../firebase-init.js';
-import { FIREBASE_BASE } from './lib/constants.js';
-const { onAuthStateChanged } = await import(`${FIREBASE_BASE}firebase-auth.js`);
-const {
-  collection,
-  onSnapshot,
-  doc,
-  deleteDoc,
-  query,
-  orderBy,
-  serverTimestamp,
-  getDoc,
-  updateDoc,
-  where,
-  getDocs,
-  addDoc,
-  limit,
-  startAfter
-} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
-import { toNio } from '../export_utils.js';
-import { showToast } from './lib/toast.js';
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import {
+  collection, onSnapshot, doc, deleteDoc, query, orderBy,
+  serverTimestamp, getDoc, updateDoc, where, getDocs, addDoc,
+  limit, startAfter
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 export default {
   async mount(container, { appState, params }) {
@@ -38,6 +24,7 @@ export default {
       (qpNum     != null && Number.isFinite(qpNum))   ? qpNum     :
       (Number.isFinite(Number(appState?.pettyCashBankId)) ? Number(appState.pettyCashBankId) : 1);
 
+    const USD_TO_NIO_RATE = 36.6;
 
     // Mapeo rápido para mostrar el nombre en UI
     const accountMappingsArray = [
@@ -190,6 +177,14 @@ export default {
         modalEl.onclick = null;
       }
     }
+    function toast(message, type='info'){
+      const colors = { info:'bg-sky-500', success:'bg-emerald-500', error:'bg-red-500' };
+      const div = document.createElement('div');
+      div.className = `fixed bottom-4 right-4 ${colors[type]} text-white font-bold py-3 px-5 rounded-lg shadow-xl`;
+      div.textContent = message;
+      container.appendChild(div);
+      setTimeout(()=>div.remove(), 2500);
+    }
 
     function buildPageQuery() {
       // Para NO requerir índice compuesto:
@@ -250,18 +245,14 @@ export default {
         renderWithClientFilters();
       } catch(err){
         console.error(err);
-        showToast('Error al cargar datos.', 'error');
+        toast('Error al cargar datos.', 'error');
       }
     }
 
     function cleanAmountToNIO(t){
-      const legacy = Number(t.cantidad || 0);
-      if (t.cantidadNIO != null) {
-        const nio = Number(t.cantidadNIO);
-        if (!Number.isNaN(nio)) return nio;
-      }
-      if (!legacy) return 0;
-      return toNio(legacy, t.moneda);
+      const base = Number(t.cantidad || 0);
+      if (!base) return 0;
+      return (t.moneda === 'USD') ? base * USD_TO_NIO_RATE : base;
     }
 
     function applyClientFilters(docs){
@@ -318,7 +309,7 @@ export default {
     function computeTotals(list){
       let inSum = 0, outSum = 0;
       for (const t of list){
-        const nio = Number(t.cantidadNIO || 0);
+        const nio = cleanAmountToNIO(t);
         if (t.tipo === 'in') inSum += nio;
         else if (t.tipo === 'out') outSum += nio;
       }
@@ -452,13 +443,13 @@ export default {
       if (btn.classList.contains('approve-btn')) {
         showModal('¿Aprobar este registro?', async () => {
           await updateDoc(doc(db, transfersCollection.path, id), { status: 'approved', updatedAt: serverTimestamp() });
-          showToast('Registro aprobado.', 'success');
+          toast('Registro aprobado.', 'success');
           renderWithClientFilters(); // refleja saldo si el filtro de estado aplica
         });
       } else if (btn.classList.contains('delete-btn')) {
         showModal('¿Eliminar este registro?', async () => {
           await deleteDoc(doc(db, transfersCollection.path, id));
-          showToast('Registro eliminado.', 'success');
+          toast('Registro eliminado.', 'success');
           renderWithClientFilters();
         });
       }

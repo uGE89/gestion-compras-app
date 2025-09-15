@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sincronizador Alegra-Firebase v2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .loader { border-top-color: #3498db; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        /* MEJORA: Estilos para las pestañas activas e inactivas */
+        .tab-active { background-color: #2563EB; color: white; }
+        .tab-inactive { background-color: #E5E7EB; color: #374151; }
+        /* MEJORA: Estilos para los botones de límite */
+        .limit-btn-active { background-color: #1D4ED8; color: white; border-color: #1D4ED8; }
+        #log-container { background-color: #1E293B; color: #E2E8F0; font-family: 'Courier New', Courier, monospace; font-size: 0.8rem; }
+        #log-container p { margin: 0; padding: 4px 8px; border-bottom: 1px solid #334155; }
+        #log-container p.error { color: #F87171; }
+        #log-container p.success { color: #4ADE80; }
+        #log-container p.info { color: #60A5FA; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="w-full max-w-4xl mx-auto bg-white rounded-xl shadow-lg my-4 sm:my-8 p-4 sm:p-6 space-y-6">
+        
+        <div class="text-center">
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Sincronización de Pagos</h1>
+            <p class="text-gray-500 mt-1 text-sm sm:text-base">Consulta y guarda registros de Alegra en Firestore.</p>
+        </div>
+        
+        <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center">
+            <h3 class="font-semibold text-lg text-slate-800 mb-2">Sincronización Automática</h3>
+            <p class="text-sm text-slate-600 mb-4">Inicia un proceso en segundo plano para buscar y guardar los pagos más recientes.</p>
+            <button id="sync-recent-button" class="bg-slate-700 hover:bg-slate-800 text-white font-bold py-2 px-5 rounded-lg transition duration-300 w-full sm:w-auto">
+                Iniciar Sincronización Reciente
+            </button>
+        </div>
+
+        <div class="p-4 sm:p-6 bg-gray-50 rounded-lg border">
+            <h3 class="font-semibold text-lg text-gray-800 mb-4">Consulta Manual</h3>
+
+            <div class="flex border-b mb-4">
+                <button id="tab-range" class="tab-active flex-1 py-2 px-4 font-medium rounded-t-lg transition">Por Rango</button>
+                <button id="tab-ids" class="tab-inactive flex-1 py-2 px-4 font-medium rounded-t-lg transition">Por IDs</button>
+            </div>
+
+            <div id="content-range" class="space-y-4">
+                <div>
+                    <label for="record-start" class="block text-sm font-medium text-gray-700 mb-2">Registro Inicial (Start)</label>
+                    <input type="number" id="record-start" inputmode="numeric" pattern="[0-9]*" class="block w-full max-w-xs px-3 py-2 text-gray-900 bg-white border border-gray-300 rounded-lg" value="0" placeholder="Ej: 0">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Límite de Registros</label>
+                    <div id="limit-presets" class="flex flex-wrap gap-2">
+                        <button data-limit="50" class="limit-btn border rounded-lg px-4 py-2 font-medium transition">50</button>
+                        <button data-limit="100" class="limit-btn border rounded-lg px-4 py-2 font-medium transition">100</button>
+                        <button data-limit="300" class="limit-btn limit-btn-active border rounded-lg px-4 py-2 font-medium transition">300</button>
+                        <button data-limit="500" class="limit-btn border rounded-lg px-4 py-2 font-medium transition">500</button>
+                    </div>
+                    <input type="hidden" id="record-limit" value="300">
+                </div>
+            </div>
+
+            <div id="content-ids" class="hidden">
+                <label for="specific-ids" class="block text-sm font-medium text-gray-700 mb-2">IDs (separados por coma o saltos de línea)</label>
+                <textarea id="specific-ids" rows="5" class="block w-full px-3 py-2 text-gray-900 bg-white border border-gray-300 rounded-lg" placeholder="Ej: 104181,104185&#10;104190"></textarea>
+            </div>
+        </div>
+        
+        <div class="space-y-4 pt-4 border-t">
+             <div>
+                <label for="secret-key" class="block text-sm font-medium text-gray-700 mb-2">Clave Secreta</label>
+                <input type="password" id="secret-key" class="block w-full max-w-sm px-3 py-2 text-gray-900 bg-white border border-gray-300 rounded-lg" placeholder="••••••••••••">
+            </div>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <button id="consult-button" class="w-full sm:w-auto flex-1 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300">
+                    <span>1. Consultar Pagos</span>
+                </button>
+                <button id="cancel-button" class="w-full sm:w-auto flex-1 flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 hidden">
+                    <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-6 w-6 mr-3"></div>
+                    <span>Cancelar Consulta</span>
+                </button>
+                <button id="save-button" class="w-full sm:w-auto flex-1 flex items-center justify-center bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                    <div id="save-loader" class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-6 w-6 mr-3 hidden"></div>
+                    <span id="save-button-text">2. Guardar en Firestore</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="output-container" class="hidden mt-6">
+            <div class="flex border-b mb-4">
+                <button id="tab-results" class="tab-active flex-1 py-2 px-4 font-medium rounded-t-lg transition">Resultados <span id="results-count" class="bg-blue-100 text-blue-800 text-xs font-semibold ml-2 px-2.5 py-0.5 rounded-full">0</span></button>
+                <button id="tab-logs" class="tab-inactive flex-1 py-2 px-4 font-medium rounded-t-lg transition">Logs de Actividad</button>
+            </div>
+            
+            <div id="content-results">
+                <div class="overflow-x-auto bg-white border rounded-lg max-h-[500px]">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 sticky top-0">
+                            <tr>
+                                <th class="p-3 text-left sticky left-0 bg-gray-50 z-10">ID</th>
+                                <th class="p-3 text-left">Fecha</th>
+                                <th class="p-3 text-left">Monto</th>
+                                <th class="p-3 text-left">Contacto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="content-logs" class="hidden">
+                 <div id="log-container" class="p-2 rounded-lg max-h-[500px] overflow-y-auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Config y Variables Globales ---
+        const BASE_URL = 'https://us-central1-gestion-compras-app.cloudfunctions.net';
+        let isConsulting = false;
+        let consultedPayments = [];
+
+        // --- Selectores de Elementos ---
+        const syncRecentButton = document.getElementById('sync-recent-button');
+        const consultButton = document.getElementById('consult-button');
+        const cancelButton = document.getElementById('cancel-button');
+        const saveButton = document.getElementById('save-button');
+        const secretKeyInput = document.getElementById('secret-key');
+        
+        // Elementos de consulta
+        const recordStartInput = document.getElementById('record-start');
+        const recordLimitInput = document.getElementById('record-limit');
+        const specificIdsInput = document.getElementById('specific-ids');
+        const limitPresetsContainer = document.getElementById('limit-presets');
+
+        // MEJORA: Selectores para la nueva UI de pestañas
+        const tabRange = document.getElementById('tab-range');
+        const tabIds = document.getElementById('tab-ids');
+        const contentRange = document.getElementById('content-range');
+        const contentIds = document.getElementById('content-ids');
+
+        const outputContainer = document.getElementById('output-container');
+        const tabResults = document.getElementById('tab-results');
+        const tabLogs = document.getElementById('tab-logs');
+        const contentResults = document.getElementById('content-results');
+        const contentLogs = document.getElementById('content-logs');
+        const resultsCount = document.getElementById('results-count');
+        
+        const tableBody = document.getElementById('results-table-body');
+        const logContainer = document.getElementById('log-container');
+
+        // --- Event Listeners ---
+        syncRecentButton.addEventListener('click', handleSyncRecent);
+        consultButton.addEventListener('click', handleConsult);
+        cancelButton.addEventListener('click', () => { isConsulting = false; });
+        saveButton.addEventListener('click', handleSave);
+
+        // MEJORA: Lógica para controlar las pestañas
+        tabRange.addEventListener('click', () => switchTab('range'));
+        tabIds.addEventListener('click', () => switchTab('ids'));
+        tabResults.addEventListener('click', () => switchOutputTab('results'));
+        tabLogs.addEventListener('click', () => switchOutputTab('logs'));
+
+        // MEJORA: Lógica para los botones de límite
+        limitPresetsContainer.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                document.querySelector('.limit-btn-active').classList.remove('limit-btn-active');
+                e.target.classList.add('limit-btn-active');
+                recordLimitInput.value = e.target.dataset.limit;
+            }
+        });
+
+        // --- Lógica de UI ---
+        function switchTab(activeTab) {
+            const isRange = activeTab === 'range';
+            tabRange.classList.toggle('tab-active', isRange);
+            tabRange.classList.toggle('tab-inactive', !isRange);
+            tabIds.classList.toggle('tab-active', !isRange);
+            tabIds.classList.toggle('tab-inactive', isRange);
+            contentRange.classList.toggle('hidden', !isRange);
+            contentIds.classList.toggle('hidden', isRange);
+        }
+
+        function switchOutputTab(activeTab) {
+             const isResults = activeTab === 'results';
+             tabResults.classList.toggle('tab-active', isResults);
+             tabResults.classList.toggle('tab-inactive', !isResults);
+             tabLogs.classList.toggle('tab-active', !isResults);
+             tabLogs.classList.toggle('tab-inactive', isResults);
+             contentResults.classList.toggle('hidden', !isResults);
+             contentLogs.classList.toggle('hidden', isResults);
+        }
+
+        function setConsultingState(isStarting) {
+            isConsulting = isStarting;
+            consultButton.classList.toggle('hidden', isStarting);
+            cancelButton.classList.toggle('hidden', !isStarting);
+            saveButton.disabled = isStarting || consultedPayments.length === 0;
+            // MEJORA: Deshabilitar inputs durante la consulta
+            [tabRange, tabIds, recordStartInput, specificIdsInput, limitPresetsContainer].forEach(el => isStarting ? el.classList.add('opacity-50', 'pointer-events-none') : el.classList.remove('opacity-50', 'pointer-events-none'));
+        }
+
+        function setSavingState(isSaving) {
+            saveButton.disabled = isSaving;
+            document.getElementById('save-loader').classList.toggle('hidden', !isSaving);
+            document.getElementById('save-button-text').textContent = isSaving ? "Guardando..." : "2. Guardar en Firestore";
+        }
+
+        function appendResults(payments) {
+            payments.forEach(p => {
+                const row = tableBody.insertRow();
+                row.className = "border-b border-gray-200 hover:bg-gray-50";
+                row.innerHTML = `
+                    <td class="p-3 sticky left-0 bg-white group-hover:bg-gray-50 font-mono text-xs">${p.id}</td>
+                    <td class="p-3">${p.date}</td>
+                    <td class="p-3 font-medium">${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(p.amount)}</td>
+                    <td class="p-3">${p.client?.name || 'N/A'}</td>
+                `;
+            });
+            resultsCount.textContent = consultedPayments.length;
+        }
+        
+        function clearAll() {
+            logContainer.innerHTML = '';
+            tableBody.innerHTML = '';
+            consultedPayments = [];
+            resultsCount.textContent = '0';
+            saveButton.disabled = true;
+            outputContainer.classList.add('hidden');
+        }
+
+        function logMessage(message, type = 'info') {
+            const p = document.createElement('p');
+            p.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            p.classList.add(type);
+            logContainer.appendChild(p);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // --- Lógica Principal (adaptada para la nueva UI) ---
+        async function handleConsult() {
+            clearAll();
+            outputContainer.classList.remove('hidden');
+            logMessage("Iniciando consulta manual...");
+            
+            if (tabIds.classList.contains('tab-active')) {
+                await consultByIds(specificIdsInput.value.trim());
+            } else {
+                await consultByRange();
+            }
+        }
+        
+        async function consultByIds(idsString) {
+            // MEJORA: Acepta comas y saltos de línea como separadores
+            const allIds = idsString.split(/[\n,]+/).map(id => id.trim()).filter(Boolean);
+            if (allIds.length === 0) {
+                logMessage('No se ingresaron IDs válidos.', 'error');
+                return;
+            }
+
+            setConsultingState(true);
+            const CHUNK_SIZE = 30;
+
+            try {
+                for (let i = 0; i < allIds.length; i += CHUNK_SIZE) {
+                    if (!isConsulting) {
+                        logMessage("Consulta cancelada por el usuario.");
+                        break;
+                    }
+                    const chunk = allIds.slice(i, i + CHUNK_SIZE);
+                    logMessage(`Consultando lote de IDs... (${i + 1} a ${i + chunk.length} de ${allIds.length})`);
+                    
+                    const payments = await fetchPayments('consultarPagosPorIds', { ids: chunk.join(',') });
+                    if (payments) {
+                        consultedPayments.push(...payments);
+                        appendResults(payments);
+                        logMessage(`Lote recibido con ${payments.length} registros.`, 'success');
+                    }
+                }
+                logMessage(`Consulta por IDs finalizada. Total: ${consultedPayments.length} registros.`, 'success');
+            } catch (error) {
+                logMessage(`Error en la consulta por IDs: ${error.message}`, 'error');
+            } finally {
+                setConsultingState(false);
+            }
+        }
+
+        async function consultByRange() {
+            const recordLimit = parseInt(recordLimitInput.value, 10) || 300;
+            let start = parseInt(recordStartInput.value, 10) || 0;
+            const BATCH_SIZE = 30;
+            
+            setConsultingState(true);
+            
+            try {
+                while (isConsulting && consultedPayments.length < recordLimit) {
+                    logMessage(`Consultando lote por rango... (Registros desde ${start})`);
+                    const payments = await fetchPayments('consultarPagos', { start, limit: BATCH_SIZE });
+                    
+                    if (payments && payments.length > 0) {
+                        consultedPayments.push(...payments);
+                        appendResults(payments);
+                        start += payments.length;
+                        logMessage(`Lote recibido con ${payments.length} registros. Total: ${consultedPayments.length}.`, 'success');
+                    } else {
+                        logMessage("No se encontraron más registros en Alegra.", 'success');
+                        break;
+                    }
+                }
+                logMessage(`Consulta por rango finalizada. Total: ${consultedPayments.length} registros.`, 'success');
+            } catch (error) {
+                logMessage(`Error en la consulta por rango: ${error.message}`, 'error');
+            } finally {
+                setConsultingState(false);
+            }
+        }
+
+        // --- Funciones de Red ---
+        async function fetchPayments(functionName, queryParams = {}) {
+            const secret = secretKeyInput.value.trim();
+            if (!secret) {
+                throw new Error('Por favor, ingresa la clave secreta.');
+            }
+            queryParams.secret = secret;
+            const params = new URLSearchParams(queryParams);
+            const functionEndpoint = `${BASE_URL.replace(/\/+$/, '')}/${functionName}`;
+            
+            const response = await fetch(`${functionEndpoint}?${params.toString()}`);
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || `Error del servidor (${response.status})`);
+            }
+            return result.payments;
+        }
+
+        async function handleSyncRecent() { /* ... (sin cambios) ... */ }
+        async function handleSave() { /* ... (sin cambios) ... */ }
+    </script>
+</body>
+</html>

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conciliación – Loader estable (fix regex)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    body{font-family:Inter,system-ui,Arial}
+    table{border-collapse:collapse}
+    th,td{border:1px solid #e5e7eb;padding:.35rem .5rem;font-size:.85rem}
+    th{background:#f8fafc}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+    .btn{border-radius:.5rem;padding:.5rem .75rem}
+  </style>
+</head>
+<body class="bg-slate-50">
+  <div class="max-w-7xl mx-auto p-4 space-y-4">
+    <h1 class="text-2xl font-bold">Loader de archivos – Alegra & Bancos (regex fix + tests)</h1>
+    <p class="text-sm text-slate-600">Carga ambos archivos (CSV / XLS / XLSX). Soporta <span class="font-semibold">sep=;</span>, encabezado intermedio del banco, meses EN/ES (usa primeras o últimas 3 letras) y fechas numéricas de Alegra (d/m/yyyy). <span class="text-amber-700 font-semibold">Se corrigió el error “Invalid regular expression: missing /”.</span></p>
+
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div class="bg-white rounded-xl p-3 shadow-sm border">
+        <h2 class="font-semibold mb-2">Reporte de <span class="text-blue-700">Banco</span></h2>
+        <div class="flex items-end gap-3 flex-wrap">
+          <div>
+            <label class="block text-sm">Tipo de cambio (TC)</label>
+            <input id="tc" type="number" step="0.01" value="1" class="border rounded px-2 py-1 w-28" />
+          </div>
+          <div>
+            <label class="block text-sm">Cuenta Banco (ID opcional)</label>
+            <input id="cuenta" type="number" class="border rounded px-2 py-1 w-28" placeholder="2" />
+          </div>
+          <div class="ml-auto">
+            <label class="block text-sm">Archivo Banco</label>
+            <input id="fileBank" type="file" accept=".csv,.xls,.xlsx" class="border rounded px-2 py-1" />
+          </div>
+          <button id="btnDemoBank" class="btn bg-slate-100 border text-slate-700" title="Cargar datos de prueba del banco">Banco demo</button>
+        </div>
+        <div id="bankInfo" class="text-sm text-slate-600 mt-2">—</div>
+      </div>
+
+      <div class="bg-white rounded-xl p-3 shadow-sm border">
+        <h2 class="font-semibold mb-2">Reporte de <span class="text-emerald-700">Alegra</span></h2>
+        <div class="flex items-end gap-3 flex-wrap">
+          <div class="ml-auto">
+            <label class="block text-sm">Archivo Alegra</label>
+            <input id="fileAlegra" type="file" accept=".csv,.xls,.xlsx" class="border rounded px-2 py-1" />
+          </div>
+          <button id="btnDemoAlegra" class="btn bg-slate-100 border text-slate-700" title="Cargar datos de prueba de Alegra">Alegra demo</button>
+        </div>
+        <div id="alegraInfo" class="text-sm text-slate-600 mt-2">—</div>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <button id="btnProcesar" class="bg-blue-600 text-white px-3 py-2 rounded disabled:opacity-50" disabled>Procesar</button>
+      <span id="status" class="text-sm text-slate-600">Cargá ambos archivos o usa los botones "demo".</span>
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-4">
+      <div class="bg-white rounded-xl p-3 shadow-sm border">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold">Banco – Preview</h3>
+          <span id="bankCount" class="text-xs text-slate-500">—</span>
+        </div>
+        <div class="overflow-auto max-h-[60vh]" id="bankTable"></div>
+      </div>
+      <div class="bg-white rounded-xl p-3 shadow-sm border">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold">Alegra – Preview</h3>
+          <span id="alegraCount" class="text-xs text-slate-500">—</span>
+        </div>
+        <div class="overflow-auto max-h-[60vh]" id="alegraTable"></div>
+      </div>
+    </div>
+
+    <details class="bg-white border rounded-xl p-3 shadow-sm">
+      <summary class="cursor-pointer font-semibold">Notas de depuración</summary>
+      <ul class="list-disc pl-5 text-sm text-slate-700">
+        <li>Se eliminó el uso de <code>beforeFirstChunk</code> con una expresión rota. Ahora se decodifica el CSV, se limpia <code>BOM</code> y <code>sep=;</code> con regex válidas: <code>/^\uFEFF/</code> y <code>/^sep=.;?\r?\n/i</code>.</li>
+        <li>Se normalizan encabezados quitando diacríticos y detectando la fila real de headers del banco y de Alegra, incluso si hay cabeceras arriba.</li>
+        <li>Fechas soportadas: <code>dd/MMM/yyyy</code> (ES/EN, ej. SEP/DEC/SEPT → usa primeras o últimas 3 letras) y <code>d/m/yyyy</code> (Alegra).</li>
+      </ul>
+    </details>
+  </div>
+
+<script>
+'use strict';
+// ================== UTILIDADES ==================
+const $ = sel => document.querySelector(sel);
+const diac = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+function parseNumberUS(v){ if(v==null||v==='') return 0; if(typeof v==='number') return v; const s=String(v).replace(/,/g,'').trim(); const n=Number(s); return Number.isFinite(n)?n:0; }
+
+function toISODate(any){
+  if(!any) return null;
+  if(any instanceof Date) return any.toISOString().slice(0,10);
+  const s = String(any).trim();
+  // 1) dd/MMM/yyyy (ES o EN) con separadores -, /, . o espacio
+  const monthMap = { ENE:'01',FEB:'02',MAR:'03',ABR:'04',MAY:'05',JUN:'06',JUL:'07',AGO:'08',SEP:'09',SET:'09',OCT:'10',NOV:'11',DIC:'12', JAN:'01',APR:'04',AUG:'08',DEC:'12' };
+  Object.assign(monthMap,{FEB:'02',MAR:'03',MAY:'05',JUN:'06',JUL:'07',SEP:'09',OCT:'10',NOV:'11'});
+  let m = s.match(/^(\d{1,2})[\/\-. ]([A-Za-z]{3,})[\/\-. ](\d{4})$/);
+  if(m){ const dd=m[1].padStart(2,'0'); const raw=m[2].toUpperCase(); const y=m[3]; const mm=monthMap[raw.slice(0,3)] || monthMap[raw.slice(-3)]; if(mm) return `${y}-${mm}-${dd}`; }
+  // 2) d/m/yyyy (Alegra)
+  m = s.match(/^(\d{1,2})[\/\-. ](\d{1,2})[\/\-. ](\d{2,4})$/);
+  if(m){ let d=parseInt(m[1],10), mo=parseInt(m[2],10), y=parseInt(m[3],10); if(y<100) y+=2000; if(mo>=1&&mo<=12&&d>=1&&d<=31){ return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`; } }
+  const d2 = new Date(s); if(!Number.isFinite(d2.getTime())) return null; return d2.toISOString().slice(0,10);
+}
+
+function autoHeaderObjects(matrixOrRows){
+  // Si ya son objetos con 'fecha' adentro, devolver
+  if(Array.isArray(matrixOrRows) && matrixOrRows.length && !Array.isArray(matrixOrRows[0])){
+    const keys=Object.keys(matrixOrRows[0]).map(k=>diac(k.toLowerCase()));
+    if(keys.some(k=>k.includes('fecha'))) return matrixOrRows;
+  }
+  const M = Array.isArray(matrixOrRows[0])? matrixOrRows : matrixOrRows.map(r=>Object.values(r));
+  const isHeaderRow = (arr=[])=>{
+    const cells = arr.map(x=>diac(String(x||'').toLowerCase().trim()));
+    const hasFecha = cells.some(c=>c==='fecha');
+    const bank = hasFecha && cells.some(c=>c.includes('numero de confirmacion'));
+    const alegra = hasFecha && cells.some(c=>c.includes('valor en nio')) && cells.some(c=>c.includes('cuenta'));
+    return bank || alegra;
+  };
+  const hIdx = M.findIndex(isHeaderRow);
+  if(hIdx===-1){
+    const header=(M[0]||[]).map(String);
+    return (M.slice(1)).map(r=>Object.fromEntries(header.map((h,i)=>[h, r[i]??''])));
+  }
+  let header=(M[hIdx]||[]).map(x=>String(x||'').trim());
+  const keep = header.map(h=>h && !/^unnamed/i.test(h));
+  header = header.filter((h,i)=>keep[i]);
+  const body = M.slice(hIdx+1).map(r=>r.filter((_,i)=>keep[i]));
+  return body.map(r=>Object.fromEntries(header.map((h,i)=>[h, r[i]??''])));
+}
+
+async function readCSV(file){
+  // Decodificar como Latin-1 y limpiar BOM + 'sep=;'
+  const buf = await file.arrayBuffer();
+  let text='';
+  try{ text = new TextDecoder('iso-8859-1').decode(buf); }catch{ text = await file.text(); }
+  text = text.replace(/^\uFEFF/, '').replace(/^sep=.;?\r?\n/i,'');
+  // Detectar delimitador según primera línea con contenido
+  const firstLine = (text.split(/\r?\n/).find(l=>l.trim().length) || '');
+  const delimiter = (firstLine.split(';').length > firstLine.split(',').length) ? ';' : ',';
+  return new Promise((resolve,reject)=>{
+    Papa.parse(text,{ header:false, skipEmptyLines:true, delimiter,
+      complete:(res)=>resolve(autoHeaderObjects(res.data||[])), error:reject });
+  });
+}
+
+async function readXLSX(file){
+  const data=await file.arrayBuffer();
+  const wb=XLSX.read(data,{type:'array'}); const ws=XLSX.Sheets[wb.SheetNames[0]];
+  const matrix=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  return autoHeaderObjects(matrix);
+}
+
+async function readAnyTable(file){
+  const name=(file?.name||'').toLowerCase();
+  if(name.endsWith('.csv')) return readCSV(file);
+  if(name.endsWith('.xls')||name.endsWith('.xlsx')) return readXLSX(file);
+  if((file.type||'').includes('csv')) return readCSV(file);
+  return readXLSX(file);
+}
+
+// ================== NORMALIZADORES ==================
+function normalizeBanco(rows,{cuentaId,tipoCambio=1}){
+  const out=[]; let minDate=null,maxDate=null; const tc=Number(tipoCambio)||1;
+  for(const r of rows){
+    const obj={}; for(const k in r){ obj[diac(k.toLowerCase())]=r[k]; }
+    const fecha = toISODate(obj['fecha']); if(!fecha) continue;
+    const confirm = String(obj['numero de confirmacion']||'').trim();
+    const desc = String(r['Descripción']||r['Descripcion']||obj['descripcion']||'');
+    const deb = parseNumberUS(obj['debito']);
+    const cred = parseNumberUS(obj['credito']);
+    const signo = cred>0? 'in' : (deb>0? 'out' : null);
+    const montoNio = (cred>0? cred : -deb) * tc;
+    out.push({ fecha, nroConfirm:confirm, descripcion:desc, montoNio:Number(montoNio.toFixed(2)), signo, cuentaId:Number(cuentaId)||null });
+    if(!minDate||fecha<minDate) minDate=fecha; if(!maxDate||fecha>maxDate) maxDate=fecha;
+  }
+  return { rows:out, desde:minDate, hasta:maxDate };
+}
+
+function normalizeAlegra(rows){
+  const out=[]; for(const r of rows){
+    const obj={}; for(const k in r){ obj[diac(k.toLowerCase())]=r[k]; }
+    const fecha = toISODate(obj['fecha']); if(!fecha) continue;
+    const tipo = String(obj['tipo']||'').toLowerCase();
+    const signo = tipo.includes('ingreso')? 'in' : (tipo.includes('egreso')? 'out' : null);
+    const notas = String(r['Notas']||obj['notas']||'');
+    const obs = String(r['Observaciones']||obj['observaciones']||'');
+    const val = parseNumberUS(obj['valor en nio']);
+    out.push({ fecha, signo, notas, observaciones:obs, valorNio:Number(val.toFixed(2)), raw:r });
+  }
+  return out;
+}
+
+// ================== UI Y PRUEBAS ==================
+let rawBank=[], rawAlegra=[];
+let B = { rows:[], desde:null, hasta:null };
+let A = [];
+
+function enableBtn(){ $('#btnProcesar').disabled = !(rawBank.length && rawAlegra.length); }
+
+$('#fileBank').addEventListener('change', async (e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  $('#status').textContent='Leyendo banco…';
+  try{
+    rawBank = await readAnyTable(f);
+    const headers = rawBank.length? Object.keys(rawBank[0]) : [];
+    $('#bankInfo').textContent = `${rawBank.length} filas crudas detectadas • headers: ${headers.join(', ') || '—'}`;
+  }catch(err){ console.error(err); $('#bankInfo').textContent='Error leyendo banco'; }
+  enableBtn();
+});
+
+$('#fileAlegra').addEventListener('change', async (e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  $('#status').textContent='Leyendo alegra…';
+  try{
+    rawAlegra = await readAnyTable(f);
+    const headers = rawAlegra.length? Object.keys(rawAlegra[0]) : [];
+    $('#alegraInfo').textContent = `${rawAlegra.length} filas crudas detectadas • headers: ${headers.join(', ') || '—'}`;
+  }catch(err){ console.error(err); $('#alegraInfo').textContent='Error leyendo alegra'; }
+  enableBtn();
+});
+
+$('#btnProcesar').addEventListener('click', ()=>{
+  const tc = Number($('#tc').value||'1');
+  const cuenta = Number($('#cuenta').value||'0')||null;
+  B = normalizeBanco(rawBank,{ cuentaId:cuenta, tipoCambio:tc });
+  A = normalizeAlegra(rawAlegra);
+  $('#bankCount').textContent = `${B.rows.length} filas • ${B.desde||'?'} → ${B.hasta||'?'} • TC=${tc}`;
+  $('#alegraCount').textContent = `${A.length} filas`;
+  renderTable('#bankTable', B.rows.slice(0,100), ['fecha','nroConfirm','descripcion','signo','montoNio']);
+  renderTable('#alegraTable', A.slice(0,100), ['fecha','signo','notas','observaciones','valorNio']);
+  if(!B.rows.length){
+    const hdr = rawBank.length? Object.keys(rawBank[0]).join(', ') : '—';
+    $('#status').textContent = 'No se detectaron filas válidas del banco. Revisa encabezado (Fecha, Número de confirmación, …). Headers detectados: ' + hdr;
+  } else {
+    $('#status').textContent = 'Listo: previews mostrados (hasta 100 filas por panel).';
+  }
+});
+
+function renderTable(sel, rows, cols){
+  const root=$(sel); if(!rows||!rows.length){ root.innerHTML='<div class="text-slate-500">(sin filas)</div>'; return; }
+  let html='<table class="w-full"><thead><tr>' + cols.map(c=>`<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+  for(const r of rows){ html += '<tr>'+ cols.map(c=>`<td class="mono">${escapeHtml(r[c])}</td>`).join('') + '</tr>'; }
+  html += '</tbody></table>'; root.innerHTML=html;
+}
+function escapeHtml(v){ if(v==null) return ''; return String(v).replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+
+// ================== DATOS DE PRUEBA (TEST CASES) ==================
+// Banco demo: incluye cabeceras arriba, mes en EN y ES, y una coma extra al final de línea de encabezado
+const demoBankCSV = `Usuario originador,Cuenta #,Alias,Fecha del reporte,Sucursal,Oficial de cuenta,Saldo
+EUGENIO FLORES VALDEZ              ,NI57BCCE00000000000890100009,{Alias},03/SEP/2025,,,"2,572,479.49"
+
+Cliente,EUGENIO FLORES VALDEZ              ,
+Nro. de cuenta,NI57BCCE00000000000890100009,
+Moneda,NIO,Tipo de cuenta,Cuenta Corriente,
+Banco,Banco LAFISE Nicaragua,
+
+Desde:,01/SEP/2025,Hasta:,30/SEP/2025
+
+Fecha,Número de confirmación,Descripción,Débito,Crédito,Saldo,Referencia,Tipo de Movimiento,
+03/SEP/2025,106328334,Transferencia entre cuentas,,"5,360.00","2,572,479.49",,TB,
+02/SEPT/2025,555001,Comisión servicio Envío veloz,"300.00",,"2,572,179.49",,A3,
+03/DEC/2025,888777,ACH recibido,,"1,000.00","2,573,179.49",,TU,
+`;
+
+// Alegra demo: con sep=; y fechas d/m/yyyy
+const demoAlegraCSV = `sep=;\nCuenta;Fecha;Número;Cliente;Identificación;Moneda;Monto;Tasa de cambio;Valor En NIO;Observaciones;Notas;Asociaciones;Tipo;Conciliada?;Método de pago;Estado\nBANCO LAFISE CUENTA 890100009;4/9/2025;A001;Cliente X;123;NIO;5360;1;5360;;106328334;;Ingreso;No;Transferencia;Aprobado\nBANCO LAFISE CUENTA 890100009;2/9/2025;A002;Cliente X;123;NIO;-300;1;-300;Comisión EV;555001;;Egreso;No;Comisión;Aprobado\nBANCO LAFISE CUENTA 890100009;3/12/2025;A003;Cliente Y;456;NIO;1000;1;1000;Pago ACH;888777;;Ingreso;No;Transferencia;Aprobado\n`;
+
+function csvToFile(csv,name='data.csv',type='text/csv'){ return new File([csv], name, { type }); }
+
+$('#btnDemoBank').addEventListener('click', async ()=>{
+  $('#status').textContent='Cargando banco demo…';
+  const f = csvToFile(demoBankCSV, 'banco_demo.csv');
+  try{
+    rawBank = await readAnyTable(f);
+    const headers = rawBank.length? Object.keys(rawBank[0]) : [];
+    $('#bankInfo').textContent = `${rawBank.length} filas crudas detectadas • headers: ${headers.join(', ') || '—'}`;
+  }catch(err){ console.error(err); $('#bankInfo').textContent='Error leyendo banco (demo)'; }
+  enableBtn();
+});
+
+$('#btnDemoAlegra').addEventListener('click', async ()=>{
+  $('#status').textContent='Cargando alegra demo…';
+  const f = csvToFile(demoAlegraCSV, 'alegra_demo.csv');
+  try{
+    rawAlegra = await readAnyTable(f);
+    const headers = rawAlegra.length? Object.keys(rawAlegra[0]) : [];
+    $('#alegraInfo').textContent = `${rawAlegra.length} filas crudas detectadas • headers: ${headers.join(', ') || '—'}`;
+  }catch(err){ console.error(err); $('#alegraInfo').textContent='Error leyendo alegra (demo)'; }
+  enableBtn();
+});
+</script>
+</body>
+</html>

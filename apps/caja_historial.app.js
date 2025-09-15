@@ -2,27 +2,14 @@
 // Historial de Caja (reutilizando colección 'transferencias' y flujo 'Aprobar')
 
 import { auth, db } from '../firebase-init.js';
-import { FIREBASE_BASE } from './lib/constants.js';
-const {
+import {
   onAuthStateChanged
-} = await import(`${FIREBASE_BASE}firebase-auth.js`);
-const {
-  collection,
-  onSnapshot,
-  doc,
-  deleteDoc,
-  query,
-  orderBy,
-  serverTimestamp,
-  getDoc,
-  updateDoc,
-  where,
-  getDocs,
-  addDoc,
-  limit,
-  startAfter
-} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
-import { showToast } from './lib/toast.js';
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import {
+  collection, onSnapshot, doc, deleteDoc, query, orderBy,
+  serverTimestamp, getDoc, updateDoc, where, getDocs, addDoc,
+  limit, startAfter
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 export default {
   async mount(container, { appState }) {
@@ -33,7 +20,7 @@ export default {
             <h1 class="text-3xl font-bold text-slate-900">Historial de Transferencias</h1>
             <p class="text-slate-500 mt-1">Consulta, filtra, edita y aprueba los registros existentes.</p>
           </div>
-            <a href="#/caja_registrar" class="mt-3 md:mt-0 px-3 py-2 bg-blue-600 text-white rounded-lg">Nuevo</a>
+          <a href="#/caja_registrar" class="mt-3 md:mt-0 px-3 py-2 bg-blue-600 text-white rounded-lg">Nuevo</a>
         </header>
 
         <main class="bg-white p-6 md:p-8 rounded-2xl shadow-xl">
@@ -102,6 +89,7 @@ export default {
     const transfersCollection = collection(db, 'transferencias');
     const alegraContactsCollection = collection(db, 'alegra_contacts');
     const alegraCategoriesCollection = collection(db, 'alegra_categories');
+    const USD_TO_NIO_RATE = 36.6;
 
     // Mapeo de cuentas (igual que el tuyo)
     const accountMappingsArray = [
@@ -164,6 +152,14 @@ export default {
         modalEl.onclick = null;
       }
     }
+    function toast(message, type='info'){
+      const colors = { info:'bg-sky-500', success:'bg-emerald-500', error:'bg-red-500' };
+      const div = document.createElement('div');
+      div.className = `fixed bottom-4 right-4 ${colors[type]} text-white font-bold py-3 px-5 rounded-lg shadow-xl`;
+      div.textContent = message;
+      container.appendChild(div);
+      setTimeout(()=>div.remove(), 2500);
+    }
 
     // Poblar filtro banco
     (function populateBankFilter(){
@@ -224,7 +220,7 @@ export default {
         await attachPage(pageIndex);
       } catch(err){
         console.error(err);
-        showToast('Error al cargar datos.', 'error');
+        toast('Error al cargar datos.', 'error');
       }
     }
 
@@ -328,10 +324,10 @@ export default {
       const hasMirror = t.mirrorTransactionId || t.originalTransactionId;
 
       const formattedDate = t.fecha ? new Date(t.fecha + 'T00:00:00').toLocaleDateString('es-ES') : 'N/A';
-      const originalAmount = Number(t.cantidad || 0);
-      const nioAmount = Number(t.cantidadNIO || 0);
-      const currencyLabel = t.moneda === 'USD' ? 'USD' : 'C$';
-      const amountHtml = `<span class="font-bold ${typeColor}">${originalAmount.toFixed(2)} ${currencyLabel} (C$${nioAmount.toFixed(2)})</span>`;
+      const nioAmount = t.moneda === 'USD' ? (t.cantidad || 0) * USD_TO_NIO_RATE : (t.cantidad || 0);
+      const amountHtml = t.moneda === 'USD'
+        ? `<span class="font-bold ${typeColor}">${(t.cantidad || 0).toFixed(2)} USD (C$${nioAmount.toFixed(2)})</span>`
+        : `<span class="font-bold ${typeColor}">C$${nioAmount.toFixed(2)}</span>`;
 
       let extraInfo = '';
       if (t.status === 'approved'){
@@ -339,7 +335,7 @@ export default {
         if (t.alegraPaymentId)     extraInfo += ` | <span class="font-medium">Alegra ID:</span> ${t.alegraPaymentId}`;
       }
 
-        const viewBtn = `<a href="#/caja_detalle?id=${encodeURIComponent(t.id)}" class="view-btn bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold py-2 px-3 rounded-lg text-sm"><span class="material-icons text-base">visibility</span> Ver</a>`;
+      const viewBtn = `<a href="#/caja_detalle?id=${encodeURIComponent(t.id)}" class="view-btn bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold py-2 px-3 rounded-lg text-sm"><span class="material-icons text-base">visibility</span> Ver</a>`;
       const editOrReviewBtn = (t.status === 'pending_review' && !hasMirror)
         ? `<a href="#/caja_editar?id=${encodeURIComponent(t.id)}" class="edit-btn bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-2 px-3 rounded-lg text-sm"><span class="material-icons text-base">edit</span> Revisar</a>`
         : viewBtn;
@@ -348,7 +344,7 @@ export default {
         ? `<button data-id="${t.id}" class="approve-btn bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold py-2 px-3 rounded-lg text-sm"><span class="material-icons text-base">check_circle</span> Aprobar</button>`
         : '';
 
-        const printBtn = `<a href="#/caja_detalle?id=${encodeURIComponent(t.id)}" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium p-2 rounded-lg text-sm"><span class="material-icons text-base">print</span></a>`;
+      const printBtn = `<a href="#/caja_detalle?id=${encodeURIComponent(t.id)}" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium p-2 rounded-lg text-sm"><span class="material-icons text-base">print</span></a>`;
       const deleteBtn = `<button data-id="${t.id}" class="delete-btn bg-red-100 hover:bg-red-200 text-red-700 font-medium p-2 rounded-lg text-sm"><span class="material-icons text-base">delete</span></button>`;
 
       return `
@@ -388,12 +384,12 @@ export default {
       if (btn.classList.contains('approve-btn')) {
         showModal('¿Aprobar este registro?', async () => {
           await updateDoc(doc(db, transfersCollection.path, id), { status: 'approved', updatedAt: serverTimestamp() });
-          showToast('Registro aprobado.', 'success');
+          toast('Registro aprobado.', 'success');
         });
       } else if (btn.classList.contains('delete-btn')) {
         showModal('¿Eliminar este registro?', async () => {
           await deleteDoc(doc(db, transfersCollection.path, id));
-          showToast('Registro eliminado.', 'success');
+          toast('Registro eliminado.', 'success');
         });
       }
     });

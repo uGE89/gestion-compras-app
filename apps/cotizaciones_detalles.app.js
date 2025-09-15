@@ -1,13 +1,7 @@
 // apps/cotizaciones_detalles.app.js
-import { FIREBASE_BASE } from './lib/constants.js';
-const {
-  doc,
-  getDoc,
-  updateDoc,
-  arrayUnion,
-  serverTimestamp
-} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
-import { showToast } from './lib/toast.js';
+import {
+  doc, getDoc, updateDoc, arrayUnion, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const COT_COLLECTION = 'cotizaciones_analizadas';
 
@@ -21,6 +15,17 @@ export default {
     const fCur  = n => `$${(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
     const fDate = s => { const d=new Date(s); return isNaN(d)? (s||'') :
       `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; };
+
+    function showToast(m,t='success'){
+      let tc=document.getElementById('toast-container');
+      if(!tc){tc=document.createElement('div');tc.id='toast-container';tc.className='fixed bottom-4 right-4 z-50';document.body.appendChild(tc);}
+      const el=document.createElement('div');
+      const c=t==='success'?'bg-emerald-500':'bg-red-500';
+      el.className=`${c} text-white font-bold py-3 px-5 rounded-lg shadow-xl transform translate-y-4 opacity-0 mb-2`;
+      el.textContent=m; tc.appendChild(el);
+      setTimeout(()=>{el.classList.remove('translate-y-4','opacity-0')},10);
+      setTimeout(()=>{el.classList.add('translate-y-4','opacity-0'); el.addEventListener('transitionend',()=>el.remove())},2800);
+    }
 
     const root = document.createElement('div');
     root.className = 'max-w-6xl mx-auto p-4 md:p-6';

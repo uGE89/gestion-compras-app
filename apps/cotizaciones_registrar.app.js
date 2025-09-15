@@ -1,18 +1,13 @@
 // apps/cotizaciones_registrar.app.js
-import { FIREBASE_BASE, PDFJS_CDN } from './lib/constants.js';
-const {
-  collection,
-  addDoc,
+import {
+  collection, addDoc,
   serverTimestamp
-} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
-const { ref, uploadBytes, getDownloadURL }
-  = await import(`${FIREBASE_BASE}firebase-storage.js`);
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { ref, uploadBytes, getDownloadURL }
+  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 import { ItemsEditor } from './components/items_editor.js';
 const COT_COLLECTION = 'cotizaciones_analizadas';
 import { associateItemsBatch, persistMappingsForItems } from './lib/associations.js';
-import { showToast } from './lib/toast.js';
-import { parseNumber } from '../export_utils.js';
-import { DEFAULT_EXCHANGE_RATE } from '../constants.js';
 
 
 
@@ -25,9 +20,20 @@ export default {
     const rfqId = params.get('rfq') || crypto.randomUUID(); // permite pasar ?rfq=...
 
     const $ = (s,r=document)=>r.querySelector(s);
+    const parseF = v => typeof v==='number'?v:parseFloat(String(v).replace(/,/g,''))||0;
+    const toast = (m,t='success')=>{
+      let tc=document.getElementById('toast-container');
+      if(!tc){tc=document.createElement('div');tc.id='toast-container';tc.className='fixed bottom-4 right-4 z-50';document.body.appendChild(tc);}
+      const el=document.createElement('div');
+      el.className=`toast ${t==='success'?'bg-emerald-500':'bg-red-500'} text-white font-bold py-3 px-5 rounded-lg shadow-xl transform translate-y-4 opacity-0 fixed bottom-4 right-4`;
+      el.textContent=m; tc.appendChild(el);
+      setTimeout(()=>{el.classList.remove('translate-y-4','opacity-0')},10);
+      setTimeout(()=>{el.classList.add('translate-y-4','opacity-0'); el.addEventListener('transitionend',()=>el.remove())},2600);
+    };
+
     // === IA (igual que compras, pero con prompt para cotización)
     async function getAI(base64, apiKey){
-      if(!apiKey){ showToast('Falta AI_API_KEY','error'); return null; }
+      if(!apiKey){ toast('Falta AI_API_KEY','error'); return null; }
       const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
       const parts=[{text:"Analiza las imágenes de una COTIZACIÓN. Devuelve JSON con { proveedor, fecha (YYYY-MM-DD), vigencia (opcional), moneda (MXN/USD u otra), tipo_cambio (num, opcional), items:[{descripcion, cantidad, total_linea (opcional), precio_unit (opcional), clave_proveedor}] }. Si falta un dato usa null. No expliques, solo JSON."}];
       base64.forEach(b=>parts.push({inlineData:{mimeType:"image/jpeg", data:b}}));
@@ -37,13 +43,13 @@ export default {
         const j=await res.json();
         const raw=j?.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
         return JSON.parse(raw);
-      }catch(e){ console.error(e); showToast('Error de IA','error'); return null; }
+      }catch(e){ console.error(e); toast('Error de IA','error'); return null; }
     }
 
     async function ensurePdf(){ if(typeof pdfjsLib!=='undefined') return;
       await new Promise((ok,ko)=>{ const s=document.createElement('script');
-        s.src=`${PDFJS_CDN}pdf.min.js`;
-        s.onload=()=>{ pdfjsLib.GlobalWorkerOptions.workerSrc=`${PDFJS_CDN}pdf.worker.min.js`; ok(); };
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js';
+        s.onload=()=>{ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js'; ok(); };
         s.onerror=ko; document.head.appendChild(s); });}
     async function pdfToImgs(file){
       await ensurePdf(); const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
@@ -113,7 +119,7 @@ export default {
       container: itemsMount,
       productCatalog,
       initialIVA: 0,     // usualmente cotiza sin IVA
-      initialTC: DEFAULT_EXCHANGE_RATE,
+      initialTC: 1,
       initialTotalAI: 0,
       onChange: ()=>{}
     });
@@ -154,11 +160,11 @@ export default {
           $('#moneda').value    = ai.moneda || 'MXN';
           $('#tc').value        = ai.tipo_cambio || 1;
 
-      const baseItems = (ai.items || []).map(raw => {
-            const cant  = parseNumber(raw.cantidad);
-            const total = parseNumber(raw.total_linea);
+          const baseItems = (ai.items || []).map(raw => {
+            const cant  = parseF(raw.cantidad);
+            const total = parseF(raw.total_linea);
             const uxp   = 1;
-            const punit = raw.precio_unit != null ? parseNumber(raw.precio_unit)
+            const punit = raw.precio_unit != null ? parseF(raw.precio_unit)
                           : (cant*uxp>0 ? total/(cant*uxp) : 0);
             return {
               descripcion_factura: raw.descripcion,
@@ -172,11 +178,11 @@ export default {
           });
           const withAssoc = await associateItemsBatch(db, $('#proveedor').value || ai.proveedor || '', baseItems);
           editor.addItems(withAssoc.map(it => ({ ...it, autoAssociated: !!it.clave_catalogo })));
-          showToast('Cotización extraída. Revisa precios/cantidades.');
+          toast('Cotización extraída. Revisa precios/cantidades.');
         } else {
-          showToast('La IA no devolvió datos. Completa manualmente.', 'error');
+          toast('La IA no devolvió datos. Completa manualmente.', 'error');
         }
-      }catch(err){ console.error(err); showToast('Error al procesar archivos.','error'); }
+      }catch(err){ console.error(err); toast('Error al procesar archivos.','error'); }
       finally { loader.classList.add('hidden'); }
     }
 
@@ -207,7 +213,7 @@ export default {
         fecha: $('#fecha').value || null,
         vigencia: $('#vigencia').value || null,
         moneda: $('#moneda').value || 'MXN',
-        tipo_cambio: parseNumber($('#tc').value) || DEFAULT_EXCHANGE_RATE,
+        tipo_cambio: parseF($('#tc').value)||1,
         notas: $('#notas').value || '',
         items,
         userId, createdAt: serverTimestamp()
@@ -218,9 +224,9 @@ export default {
 
         await persistMappingsForItems(db, $('#proveedor').value.trim(), editor.getItems());
 
-        showToast('Cotización guardada.');
+        toast('Cotización guardada.');
         location.hash = `#/cotizaciones_comparar?rfq=${rfqId}`;
-      } catch(err){ console.error(err); showToast('Error al guardar','error'); }
+      } catch(err){ console.error(err); toast('Error al guardar','error'); }
       finally { if(btn){ btn.disabled=false; btn.textContent='Guardar Cotización'; } }
     });
   },
