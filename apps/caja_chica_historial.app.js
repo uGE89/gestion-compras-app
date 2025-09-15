@@ -9,6 +9,7 @@ import {
   limit, startAfter
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { toNio } from '../export_utils.js';
+import { showToast } from './lib/toast.js';
 
 export default {
   async mount(container, { appState, params }) {
@@ -177,14 +178,6 @@ export default {
         modalEl.onclick = null;
       }
     }
-    function toast(message, type='info'){
-      const colors = { info:'bg-sky-500', success:'bg-emerald-500', error:'bg-red-500' };
-      const div = document.createElement('div');
-      div.className = `fixed bottom-4 right-4 ${colors[type]} text-white font-bold py-3 px-5 rounded-lg shadow-xl`;
-      div.textContent = message;
-      container.appendChild(div);
-      setTimeout(()=>div.remove(), 2500);
-    }
 
     function buildPageQuery() {
       // Para NO requerir índice compuesto:
@@ -245,7 +238,7 @@ export default {
         renderWithClientFilters();
       } catch(err){
         console.error(err);
-        toast('Error al cargar datos.', 'error');
+        showToast('Error al cargar datos.', 'error');
       }
     }
 
@@ -447,13 +440,13 @@ export default {
       if (btn.classList.contains('approve-btn')) {
         showModal('¿Aprobar este registro?', async () => {
           await updateDoc(doc(db, transfersCollection.path, id), { status: 'approved', updatedAt: serverTimestamp() });
-          toast('Registro aprobado.', 'success');
+          showToast('Registro aprobado.', 'success');
           renderWithClientFilters(); // refleja saldo si el filtro de estado aplica
         });
       } else if (btn.classList.contains('delete-btn')) {
         showModal('¿Eliminar este registro?', async () => {
           await deleteDoc(doc(db, transfersCollection.path, id));
-          toast('Registro eliminado.', 'success');
+          showToast('Registro eliminado.', 'success');
           renderWithClientFilters();
         });
       }

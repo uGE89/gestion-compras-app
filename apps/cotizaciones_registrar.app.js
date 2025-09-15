@@ -8,6 +8,7 @@ import { ref, uploadBytes, getDownloadURL }
 import { ItemsEditor } from './components/items_editor.js';
 const COT_COLLECTION = 'cotizaciones_analizadas';
 import { associateItemsBatch, persistMappingsForItems } from './lib/associations.js';
+import { showToast } from './lib/toast.js';
 import { parseNumber } from '../export_utils.js';
 import { DEFAULT_EXCHANGE_RATE } from '../constants.js';
 
@@ -22,19 +23,9 @@ export default {
     const rfqId = params.get('rfq') || crypto.randomUUID(); // permite pasar ?rfq=...
 
     const $ = (s,r=document)=>r.querySelector(s);
-    const toast = (m,t='success')=>{
-      let tc=document.getElementById('toast-container');
-      if(!tc){tc=document.createElement('div');tc.id='toast-container';tc.className='fixed bottom-4 right-4 z-50';document.body.appendChild(tc);}
-      const el=document.createElement('div');
-      el.className=`toast ${t==='success'?'bg-emerald-500':'bg-red-500'} text-white font-bold py-3 px-5 rounded-lg shadow-xl transform translate-y-4 opacity-0 fixed bottom-4 right-4`;
-      el.textContent=m; tc.appendChild(el);
-      setTimeout(()=>{el.classList.remove('translate-y-4','opacity-0')},10);
-      setTimeout(()=>{el.classList.add('translate-y-4','opacity-0'); el.addEventListener('transitionend',()=>el.remove())},2600);
-    };
-
     // === IA (igual que compras, pero con prompt para cotización)
     async function getAI(base64, apiKey){
-      if(!apiKey){ toast('Falta AI_API_KEY','error'); return null; }
+      if(!apiKey){ showToast('Falta AI_API_KEY','error'); return null; }
       const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
       const parts=[{text:"Analiza las imágenes de una COTIZACIÓN. Devuelve JSON con { proveedor, fecha (YYYY-MM-DD), vigencia (opcional), moneda (MXN/USD u otra), tipo_cambio (num, opcional), items:[{descripcion, cantidad, total_linea (opcional), precio_unit (opcional), clave_proveedor}] }. Si falta un dato usa null. No expliques, solo JSON."}];
       base64.forEach(b=>parts.push({inlineData:{mimeType:"image/jpeg", data:b}}));
@@ -44,7 +35,7 @@ export default {
         const j=await res.json();
         const raw=j?.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
         return JSON.parse(raw);
-      }catch(e){ console.error(e); toast('Error de IA','error'); return null; }
+      }catch(e){ console.error(e); showToast('Error de IA','error'); return null; }
     }
 
     async function ensurePdf(){ if(typeof pdfjsLib!=='undefined') return;
@@ -179,11 +170,11 @@ export default {
           });
           const withAssoc = await associateItemsBatch(db, $('#proveedor').value || ai.proveedor || '', baseItems);
           editor.addItems(withAssoc.map(it => ({ ...it, autoAssociated: !!it.clave_catalogo })));
-          toast('Cotización extraída. Revisa precios/cantidades.');
+          showToast('Cotización extraída. Revisa precios/cantidades.');
         } else {
-          toast('La IA no devolvió datos. Completa manualmente.', 'error');
+          showToast('La IA no devolvió datos. Completa manualmente.', 'error');
         }
-      }catch(err){ console.error(err); toast('Error al procesar archivos.','error'); }
+      }catch(err){ console.error(err); showToast('Error al procesar archivos.','error'); }
       finally { loader.classList.add('hidden'); }
     }
 
@@ -225,9 +216,9 @@ export default {
 
         await persistMappingsForItems(db, $('#proveedor').value.trim(), editor.getItems());
 
-        toast('Cotización guardada.');
+        showToast('Cotización guardada.');
         location.hash = `#/cotizaciones_comparar?rfq=${rfqId}`;
-      } catch(err){ console.error(err); toast('Error al guardar','error'); }
+      } catch(err){ console.error(err); showToast('Error al guardar','error'); }
       finally { if(btn){ btn.disabled=false; btn.textContent='Guardar Cotización'; } }
     });
   },

@@ -140,6 +140,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity
     import { collection, addDoc, serverTimestamp, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
     import { toNio } from './export_utils.js';
+    import { showToast } from './apps/lib/toast.js';
 
     // --- 1. ESTADO Y CONSTANTES GLOBALES ---
     let userId = null, currentImageUrl = null;
@@ -1053,15 +1054,6 @@ async function checkConfirmationExists(number) {
         return isNaN(n) ? null : n;
     }
     
-    function showToast(message, type = 'info') {
-        const t = document.createElement('div');
-        const c = { info: 'bg-sky-600', success: 'bg-emerald-600', warning: 'bg-amber-500', error: 'bg-red-600' };
-        t.className = `p-4 rounded-lg shadow-xl text-white font-semibold animate-pulse ${c[type]}`;
-        t.textContent = message;
-        document.getElementById('toast-container').appendChild(t);
-        setTimeout(() => t.remove(), 4000);
-    }
-
         function fileToBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = event => resolve(event.target.result); reader.onerror = error => reject(error); reader.readAsDataURL(file); }); }
 
 // Normaliza para buscar (sin acentos, minúsculas)
