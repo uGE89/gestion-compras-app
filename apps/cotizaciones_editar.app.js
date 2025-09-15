@@ -4,6 +4,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { ItemsEditor } from './components/items_editor.js';
 import { persistMappingsForItems } from './lib/associations.js';
+import { showToast } from './lib/toast.js';
 import { parseNumber } from '../export_utils.js';
 import { DEFAULT_EXCHANGE_RATE } from '../constants.js';
 const COT_COLLECTION = 'cotizaciones_analizadas';
@@ -18,17 +19,6 @@ export default {
     if (!id) { container.innerHTML = '<div class="p-6 text-slate-500">ID no especificado.</div>'; return; }
 
     const $ = (s, r=document)=> r.querySelector(s);
-
-    function showToast(m,t='success'){
-      let tc=document.getElementById('toast-container');
-      if(!tc){tc=document.createElement('div');tc.id='toast-container';tc.className='fixed bottom-4 right-4 z-50';document.body.appendChild(tc);}
-      const el=document.createElement('div');
-      const c=t==='success'?'bg-emerald-500':'bg-red-500';
-      el.className=`${c} text-white font-bold py-3 px-5 rounded-lg shadow-xl transform translate-y-4 opacity-0 mb-2`;
-      el.textContent=m; tc.appendChild(el);
-      setTimeout(()=>{el.classList.remove('translate-y-4','opacity-0')},10);
-      setTimeout(()=>{el.classList.add('translate-y-4','opacity-0'); el.addEventListener('transitionend',()=>el.remove())},2800);
-    }
 
     // ===== IA directa (opcional, solo para anexar) =====
     async function getAIDataDirect(base64Array, apiKey) {

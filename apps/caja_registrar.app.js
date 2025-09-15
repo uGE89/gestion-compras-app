@@ -7,6 +7,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 import { toNio } from '../export_utils.js';
+import { showToast } from './lib/toast.js';
 
 export default {
   async mount(container) {
@@ -511,14 +512,6 @@ export default {
     }
 
     // ---------- Utilidades ----------
-    function showToast(message, type='info') {
-      const div = document.createElement('div');
-      const colors = { info:'bg-sky-600', success:'bg-emerald-600', warning:'bg-amber-500', error:'bg-red-600' };
-      div.className = `p-4 rounded-lg shadow-xl text-white font-semibold ${colors[type]}`;
-      div.textContent = message;
-      $('#toast-container').appendChild(div);
-      setTimeout(()=>div.remove(), 3500);
-    }
     const fileToBase64 = (file) => new Promise((res, rej) => {
       const r = new FileReader(); r.onload = e => res(e.target.result); r.onerror = rej; r.readAsDataURL(file);
     });

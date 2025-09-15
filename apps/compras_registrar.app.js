@@ -7,6 +7,7 @@ import { ref, uploadBytes, getDownloadURL }
   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 import { ItemsEditor } from './components/items_editor.js';
 import { associateItemsBatch, persistMappingsForItems } from './lib/associations.js';
+import { showToast } from './lib/toast.js';
 import { parseNumber } from '../export_utils.js';
 import { DEFAULT_EXCHANGE_RATE } from '../constants.js';
 
@@ -23,17 +24,6 @@ export default {
 
     // ===== Utils =====
     const $  = (sel, root=document) => root.querySelector(sel);
-
-    function showToast(m,t='success'){
-      let tc = document.getElementById('toast-container');
-      if (!tc) { tc = document.createElement('div'); tc.id='toast-container'; tc.className='fixed bottom-4 right-4 z-50'; document.body.appendChild(tc); }
-      const el=document.createElement('div');
-      const color = t==='success'?'bg-emerald-500':'bg-red-500';
-      el.className = `toast ${color} text-white font-bold py-3 px-5 rounded-lg shadow-xl transform translate-y-4 opacity-0 fixed bottom-4 right-4 z-50`;
-      el.textContent = m; tc.appendChild(el);
-      setTimeout(()=>{el.classList.remove('translate-y-4','opacity-0')},10);
-      setTimeout(()=>{el.classList.add('translate-y-4','opacity-0'); el.addEventListener('transitionend',()=>el.remove())},3000);
-    }
 
     // ===== IA directa (temporal en frontend) =====
     async function getAIDataDirect(base64Array, apiKey) {
