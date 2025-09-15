@@ -1,7 +1,7 @@
 // /public/apps/caja_registrar.app.js
 // Registrar movimientos de caja (usa colección 'transferencias')
 import { auth, db, storage, firebaseConfig } from '../firebase-init.js';
-import { FIREBASE_BASE } from './lib/constants.js';
+import { FIREBASE_BASE, GEMINI_PRO, buildAiUrl } from './lib/constants.js';
 import { onAuthStateChanged, signInAnonymously } from `${FIREBASE_BASE}firebase-auth.js`;
 import {
   collection,
@@ -239,7 +239,7 @@ export default {
 
     async function getAIData(base64, mimeType) {
       const apiKey = firebaseConfig.apiKey;
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`;
+      const apiUrl = buildAiUrl(GEMINI_PRO) + apiKey;
       const prompt = buildAIPrompt(alegraContactsCache, alegraCategoriesCache);
       const payload = {
         contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType, data: base64 } }] }],
