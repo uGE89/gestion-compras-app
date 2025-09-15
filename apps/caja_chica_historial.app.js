@@ -50,11 +50,7 @@ export default {
       <div class="p-4 md:p-6 max-w-6xl mx-auto">
         <header class="flex flex-col md:flex-row justify-between items-center mb-6">
           <div>
-            <h1 class="text-3xl font-bold text-slate-900">Caja Chica</h1>
-            <p class="text-slate-500 mt-1 flex items-center gap-2">
-              <span class="inline-block w-3 h-3 rounded-full" style="background:${pettyMeta.color}"></span>
-              <span>Cuenta fija: <strong>${pettyMeta.name}</strong> (ID: ${PETTY_CASH_BANK_ID})</span>
-            </p>
+            <h1 class="text-3xl font-bold" style="color:${pettyMeta.color}">${pettyMeta.name}</h1>
           </div>
           <a href="#/caja_registrar" class="mt-3 md:mt-0 px-3 py-2 bg-blue-600 text-white rounded-lg">Nuevo</a>
         </header>
@@ -85,11 +81,6 @@ export default {
             <div class="md:col-span-2">
               <label class="block text-sm font-medium text-slate-700">Fecha</label>
               <input id="filter-date" type="date" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2">
-            </div>
-            <!-- Banco fijo oculto, solo mostramos etiqueta -->
-            <div class="md:col-span-2">
-              <label class="block text-sm font-medium text-slate-700">Banco</label>
-              <input type="text" value="${pettyMeta.name}" class="mt-1 block w-full rounded-md border-slate-200 bg-slate-50 text-slate-600 p-2" disabled>
             </div>
             <div class="md:col-span-2">
               <label class="block text-sm font-medium text-slate-700">Estado</label>
