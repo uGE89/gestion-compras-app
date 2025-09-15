@@ -136,7 +136,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity
     
     <script type="module">
     import { auth, db, storage, firebaseConfig } from './firebase-init.js';
-    import { FIREBASE_BASE } from './apps/lib/constants.js';
+    import { FIREBASE_BASE, PDFJS_CDN } from './apps/lib/constants.js';
     import { onAuthStateChanged, signInAnonymously } from `${FIREBASE_BASE}firebase-auth.js`;
     import { collection, addDoc, serverTimestamp, getDocs, query, where } from `${FIREBASE_BASE}firebase-firestore.js`;
     import { ref, uploadBytes, getDownloadURL } from `${FIREBASE_BASE}firebase-storage.js`;
@@ -967,7 +967,7 @@ Si **NO** es un estado de cuenta con columnas (comprobantes, tickets, vouchers, 
     }
     
     async function renderPdfToImage(file) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN}pdf.worker.min.js`;
         const fileReader = new FileReader();
         return new Promise((resolve, reject) => {
             fileReader.onload = async function() {

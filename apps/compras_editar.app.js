@@ -1,5 +1,5 @@
 // apps/compras_editar.app.js
-import { FIREBASE_BASE } from './lib/constants.js';
+import { FIREBASE_BASE, PDFJS_CDN } from './lib/constants.js';
 import {
   collection,
   doc,
@@ -75,8 +75,11 @@ export default {
       if (typeof pdfjsLib !== 'undefined') return;
       await new Promise((resolve, reject) => {
         const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js';
-        s.onload = () => { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js'; resolve(); };
+        s.src = `${PDFJS_CDN}pdf.min.js`;
+        s.onload = () => {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN}pdf.worker.min.js`;
+          resolve();
+        };
         s.onerror = reject;
         document.head.appendChild(s);
       });

@@ -1,5 +1,5 @@
 // apps/cotizaciones_registrar.app.js
-import { FIREBASE_BASE } from './lib/constants.js';
+import { FIREBASE_BASE, PDFJS_CDN } from './lib/constants.js';
 import {
   collection,
   addDoc,
@@ -42,8 +42,8 @@ export default {
 
     async function ensurePdf(){ if(typeof pdfjsLib!=='undefined') return;
       await new Promise((ok,ko)=>{ const s=document.createElement('script');
-        s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js';
-        s.onload=()=>{ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js'; ok(); };
+        s.src=`${PDFJS_CDN}pdf.min.js`;
+        s.onload=()=>{ pdfjsLib.GlobalWorkerOptions.workerSrc=`${PDFJS_CDN}pdf.worker.min.js`; ok(); };
         s.onerror=ko; document.head.appendChild(s); });}
     async function pdfToImgs(file){
       await ensurePdf(); const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
