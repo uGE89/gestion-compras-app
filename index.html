@@ -22,7 +22,6 @@
         .nav-menu-mobile { display: none; }
         .nav-menu-mobile.active { display: flex; }
         /* --- Visuales nuevos, sin tocar la lógica --- */
-        .module-header { position: sticky; top: 0; z-index: 30; backdrop-filter: saturate(180%) blur(6px); }
         .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; }
         /* Oculta el botón hamburguesa y el menú superior en móvil */
 @media (max-width: 767px) {
@@ -69,17 +68,6 @@
                 </div>
             </div>
         </nav>
-
-        <!-- Cabecera pegajosa del módulo con búsqueda (solo UI; sin JS nuevo) -->
-        <div class="module-header bg-slate-100/80 supports-[backdrop-filter]:bg-slate-100/60 border-b border-slate-200">
-            <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-3">
-                <div class="relative">
-                    <span class="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-                    <input type="search" placeholder="Buscar productos, proveedores o vistas…" class="w-full h-11 pl-10 pr-3 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                </div>
-            </div>
-        </div>
-
         <main id="content-container" class="container mx-auto p-4 md:p-6 flex-grow">
         </main>
     </div>
