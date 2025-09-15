@@ -1,14 +1,14 @@
 // apps/compras_detalles.app.js
 import { FIREBASE_BASE } from './lib/constants.js';
-import {
+const {
   doc,
   getDoc,
   updateDoc,
   arrayUnion,
   serverTimestamp
-} from `${FIREBASE_BASE}firebase-firestore.js`;
-import { ref, uploadBytes, getDownloadURL }
-  from `${FIREBASE_BASE}firebase-storage.js`;
+} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
+const { ref, uploadBytes, getDownloadURL }
+  = await import(`${FIREBASE_BASE}firebase-storage.js`);
 
 export default {
   title: 'Detalles de Compra',

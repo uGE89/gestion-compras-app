@@ -1,7 +1,7 @@
 // apps/lib/associations.js
 import { FIREBASE_BASE } from './constants.js';
-import { doc, getDoc, setDoc, serverTimestamp, increment }
-  from `${FIREBASE_BASE}firebase-firestore.js`;
+const { doc, getDoc, setDoc, serverTimestamp, increment }
+  = await import(`${FIREBASE_BASE}firebase-firestore.js`);
 import { cacheGet, cachePut } from './mapping_cache.js';
 
 export const MAP_COLLECTION = 'mapeo_articulos';

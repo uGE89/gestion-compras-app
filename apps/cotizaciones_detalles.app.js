@@ -1,12 +1,12 @@
 // apps/cotizaciones_detalles.app.js
 import { FIREBASE_BASE } from './lib/constants.js';
-import {
+const {
   doc,
   getDoc,
   updateDoc,
   arrayUnion,
   serverTimestamp
-} from `${FIREBASE_BASE}firebase-firestore.js`;
+} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
 import { showToast } from './lib/toast.js';
 
 const COT_COLLECTION = 'cotizaciones_analizadas';

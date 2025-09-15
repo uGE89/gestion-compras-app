@@ -1,7 +1,7 @@
 // /public/apps/caja_transferir.app.js
 import { db } from '../firebase-init.js';
 import { FIREBASE_BASE } from './lib/constants.js';
-import {
+const {
   collection,
   doc,
   getDoc,
@@ -12,7 +12,7 @@ import {
   where,
   getDocs,
   updateDoc
-} from `${FIREBASE_BASE}firebase-firestore.js`;
+} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
 import { USD_TO_NIO_RATE } from '../constants.js';
 
 const accountMappingsArray = [

@@ -1,12 +1,12 @@
 // apps/cotizaciones_registrar.app.js
 import { FIREBASE_BASE, PDFJS_CDN } from './lib/constants.js';
-import {
+const {
   collection,
   addDoc,
   serverTimestamp
-} from `${FIREBASE_BASE}firebase-firestore.js`;
-import { ref, uploadBytes, getDownloadURL }
-  from `${FIREBASE_BASE}firebase-storage.js`;
+} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
+const { ref, uploadBytes, getDownloadURL }
+  = await import(`${FIREBASE_BASE}firebase-storage.js`);
 import { ItemsEditor } from './components/items_editor.js';
 const COT_COLLECTION = 'cotizaciones_analizadas';
 import { associateItemsBatch, persistMappingsForItems } from './lib/associations.js';

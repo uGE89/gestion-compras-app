@@ -1,8 +1,8 @@
 // apps/cotizaciones_comparar.app.js
 import { FIREBASE_BASE } from './lib/constants.js';
-import { collection, query, where, getDocs }
-  from `${FIREBASE_BASE}firebase-firestore.js`;
-  const COT_COLLECTION = 'cotizaciones_analizadas';
+const { collection, query, where, getDocs }
+  = await import(`${FIREBASE_BASE}firebase-firestore.js`);
+const COT_COLLECTION = 'cotizaciones_analizadas';
 
 
 export default {

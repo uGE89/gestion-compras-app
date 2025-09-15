@@ -1,12 +1,12 @@
 // /public/apps/caja_editar.app.js
 import { db } from '../firebase-init.js';
 import { FIREBASE_BASE } from './lib/constants.js';
-import {
+const {
   doc,
   getDoc,
   updateDoc,
   serverTimestamp
-} from `${FIREBASE_BASE}firebase-firestore.js`;
+} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
 
 export default {
   async mount(container, { params }) {
