@@ -74,6 +74,7 @@ export default {
           <div class="flex gap-2">
             <a id="btn-editar" class="px-3 py-2 bg-blue-600 text-white rounded-lg">Editar</a>
             <button id="btn-aprobar" class="px-3 py-2 bg-emerald-600 text-white rounded-lg hidden">Aprobar</button>
+            <a id="btn-transferir" class="px-3 py-2 bg-violet-600 text-white rounded-lg">Transferir</a>
             <button id="btn-imprimir" class="px-3 py-2 bg-slate-200 text-slate-800 rounded-lg">Imprimir</button>
             <button id="btn-eliminar" class="px-3 py-2 bg-rose-600 text-white rounded-lg">Eliminar</button>
             <a href="#/caja_historial" class="px-3 py-2 bg-slate-100 text-slate-800 rounded-lg">Volver</a>
@@ -128,6 +129,7 @@ export default {
       btnAprobar: $('#btn-aprobar'),
       btnImprimir: $('#btn-imprimir'),
       btnEliminar: $('#btn-eliminar'),
+      btnTransferir: $('#btn-transferir'),
     };
 
     function fitToA4(el) {
@@ -244,6 +246,15 @@ export default {
       refs.btnEditar.href = `#/caja_editar?id=${encodeURIComponent(id)}`;
       refs.btnAprobar.classList.toggle('hidden', t.status === 'approved');
 
+      // Transferir: disponible solo aquí (detalle). Si ya tiene espejo, desactivar.
+      if (t.mirrorTransactionId) {
+        refs.btnTransferir.classList.add('opacity-60','pointer-events-none');
+        refs.btnTransferir.title = 'Ya existe una transferencia espejo';
+      } else {
+        refs.btnTransferir.classList.remove('opacity-60','pointer-events-none');
+        refs.btnTransferir.title = '';
+      }
+
       refs.btnAprobar.onclick = async () => {
         await updateDoc(doc(db, 'transferencias', id), { status: 'approved', updatedAt: serverTimestamp() });
         await load();
@@ -257,6 +268,12 @@ export default {
         location.hash = '#/caja_historial';
       };
     }
+
+    refs.btnTransferir.onclick = () => {
+      const id = params.get('id');
+      if (!id) return;
+      location.hash = `#/caja_transferir?id=${encodeURIComponent(id)}`;
+    };
 
     await load();
   },
