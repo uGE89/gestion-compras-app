@@ -52,7 +52,12 @@ export default {
           <div>
             <h1 class="text-3xl font-bold" style="color:${pettyMeta.color}">${pettyMeta.name}</h1>
           </div>
-          <a href="#/caja_registrar" class="mt-3 md:mt-0 px-3 py-2 bg-blue-600 text-white rounded-lg">Nuevo</a>
+          <div class="mt-3 md:mt-0 flex items-center gap-2">
+            <a href="#/caja_formulario?bankId=${PETTY_CASH_BANK_ID}&tipo=in"
+               class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg">Ingreso</a>
+            <a href="#/caja_formulario?bankId=${PETTY_CASH_BANK_ID}&tipo=out"
+               class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg">Retiro</a>
+          </div>
         </header>
 
         <main class="bg-white p-6 md:p-8 rounded-2xl shadow-xl">
