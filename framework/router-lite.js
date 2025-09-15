@@ -1,6 +1,7 @@
 // framework/router-lite.js
-export function createRouter({ container, registry, deps, fallbackLoadContent }) {
+export function createRouter({ container, registry, deps, fallbackLoadContent, soloApp }) {
   let current = null;
+  let soloActive = false;
 
   function parseRoute(route) {
     const hash = route?.startsWith('#') ? route : `#${route || ''}`;
@@ -21,6 +22,37 @@ export function createRouter({ container, registry, deps, fallbackLoadContent })
   async function mount(route) {
     const { cleanPath, params } = parseRoute(route || location.hash || '#/creador-pedido');
 
+    let targetPath = cleanPath;
+
+    if (soloApp) {
+      const flagParam = soloApp.flagParam || 'solo';
+      const flagValue = soloApp.flagValue || '1';
+      const appParam = soloApp.appParam || 'app';
+      const wantsSolo = params.get(flagParam) === flagValue;
+      const requestedApp = params.get(appParam);
+      const shouldForceSolo = wantsSolo && requestedApp === soloApp.id;
+
+      if (shouldForceSolo) {
+        targetPath = soloApp.id;
+        if (!soloActive) {
+          soloApp.onEnter?.({ params });
+        }
+        soloActive = true;
+        const queryString = params.toString();
+        const expectedHash = `#/${soloApp.id}${queryString ? `?${queryString}` : ''}`;
+        if (typeof window !== 'undefined' && typeof window.location !== 'undefined' && window.location.hash !== expectedHash) {
+          if (typeof history !== 'undefined' && history.replaceState) {
+            history.replaceState(null, '', expectedHash);
+          } else {
+            window.location.hash = expectedHash;
+          }
+        }
+      } else if (soloActive) {
+        soloApp.onExit?.({ params });
+        soloActive = false;
+      }
+    }
+
     // Desmontar app actual
     if (current?.unmount) {
       try { current.unmount(); } catch {}
@@ -28,20 +60,20 @@ export function createRouter({ container, registry, deps, fallbackLoadContent })
     container.innerHTML = '<div class="text-center py-10">Cargando…</div>';
 
     // 1) Intentar micro-app registrada
-    let loader = registry[cleanPath];
+    let loader = registry[targetPath];
 
     // 2) Fallback: si piden un .html, delega al app_loader
     if (!loader) {
-      const looksHtml = cleanPath.endsWith('.html');
+      const looksHtml = targetPath.endsWith('.html');
       if (fallbackLoadContent) {
         container.innerHTML = '';
         // reconstruye ruta original del .html (sin hash)
-        const filename = looksHtml ? cleanPath : 'fallback.html';
+        const filename = looksHtml ? targetPath : 'fallback.html';
         return fallbackLoadContent(filename);
       }
 
       container.innerHTML = `<div class="text-center text-red-500 py-10">
-        Ruta desconocida: <code>${cleanPath || '(vacía)'}</code>
+        Ruta desconocida: <code>${targetPath || '(vacía)'}</code>
       </div>`;
       return;
     }
