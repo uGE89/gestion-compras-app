@@ -11,7 +11,7 @@ export const appState = {
 };
 
 // Claves de almacenamiento (versionadas por si cambias el formato)
-const KEYS = {
+export const KEYS = {
   pedido: 'pedidoDraft:v1',
   cotizacion: 'cotizacionDraft:v1',
 };

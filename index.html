@@ -86,7 +86,7 @@
     </nav>
 
 <script type="module">
-    import { appState, hydrateDrafts, savePedidoDraft, saveCotizacionDraft } from './state.js';
+    import { appState, hydrateDrafts, savePedidoDraft, saveCotizacionDraft, KEYS } from './state.js';
     import { auth, db as firestoreDb, storage as firebaseStorage } from './firebase-init.js';
     import { FIREBASE_BASE } from './apps/lib/constants.js';
     import { onAuthStateChanged, signOut } from `${FIREBASE_BASE}firebase-auth.js`;
@@ -383,7 +383,7 @@ window.addEventListener('beforeunload', () => {
 });
 
 window.addEventListener('storage', (e) => {
-  if (e.key === 'pedidoDraft:v1' || e.key === 'cotizacionDraft:v1') {
+  if (e.key === KEYS.pedido || e.key === KEYS.cotizacion) {
     hydrateDrafts();
   }
 });
