@@ -1,5 +1,5 @@
 // apps/mis_pedidos.app.js
-import { FIREBASE_BASE } from './lib/constants.js';
+import { FIREBASE_BASE, TAILWIND_CDN } from './lib/constants.js';
 
 export default {
   async mount(container, { appState, auth, db }) {
@@ -209,7 +209,7 @@ export default {
         <html lang="es">
           <head>
             <title>Pedido ${orderId.slice(0,6)}</title>
-            <script src="https://cdn.tailwindcss.com"><\/script>
+            <script src="${TAILWIND_CDN}"><\/script>
             <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
             <style>
               body { font-family: 'Inter', sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
