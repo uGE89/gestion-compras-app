@@ -10,12 +10,19 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 export default {
-  async mount(container, { appState }) {
+  async mount(container, { appState, params }) {
     // ====== Config: ID fijo de cuenta de Caja Chica ======
-    // 1) Si appState trae un id, úsalo; 2) o lee de ?bankId=; 3) o default 1 (Caja central)
-    const urlParams = new URLSearchParams(location.hash.split('?')[1] || '');
+    // Prioridad:
+    // 1) param en URL   -> #/caja_chica_historial?bankId=9
+    // 2) appState       -> appState.pettyCashBankId
+    // 3) default        -> 1
+
+    const qpId = params.get('bankId');
+    const qpNum = qpId != null ? Number(qpId) : null;
+
     const PETTY_CASH_BANK_ID =
-      Number(appState?.pettyCashBankId ?? urlParams.get('bankId')) || 1;
+      (qpNum     != null && Number.isFinite(qpNum))   ? qpNum     :
+      (Number.isFinite(Number(appState?.pettyCashBankId)) ? Number(appState.pettyCashBankId) : 1);
 
     const USD_TO_NIO_RATE = 36.6;
 
