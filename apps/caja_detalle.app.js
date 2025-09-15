@@ -9,112 +9,51 @@ function setupA4PrintStyles() {
   const style = document.createElement('style');
   style.id = 'print-a4-style';
   style.textContent = `
-  /* === Print A4: una sola página, solo detalle === */
+  /* === Print A4: clonado fijo en una sola página === */
   @media print {
-    @page {
-      size: A4 portrait;
-      margin: 12mm; /* márgenes solicitados */
-    }
+    @page { size: A4 portrait; margin: 12mm; }
 
-    /* Oculta TODO excepto el detalle (sin colapsar layout) */
-    body * {
-      visibility: hidden !important;
-    }
-    .printable-area,
-    .printable-area * {
-      visibility: visible !important;
-    }
+    /* Oculta TODO por defecto durante la impresión */
+    body * { display: none !important; }
 
-    /* Asegura que el detalle se ubique en la página dentro de los márgenes */
-    .printable-area {
-      position: relative !important;  /* o fixed si quieres despegarlo del flujo */
+    /* El clon de impresión y sus hijos sí se muestran */
+    .print-only, .print-only * { display: block !important; visibility: visible !important; }
+
+    /* Caja de impresión: fija dentro de los márgenes */
+    .print-only {
+      position: fixed !important;
+      inset: 12mm !important;          /* top/right/bottom/left */
+      width: auto !important;
+      height: auto !important;
+      overflow: hidden !important;
       box-shadow: none !important;
       border: none !important;
       background: #fff !important;
-      width: 186mm !important;
+      z-index: 2147483647 !important;
       break-inside: avoid;
       page-break-inside: avoid;
-      z-index: 9999 !important; /* por si hay stacking contexts */
-    }
-
-    /* Contenedor general del detalle (si usas uno) */
-    .printable-area .p-4, 
-    .printable-area .p-6, 
-    .printable-area .md\:p-6, 
-    .printable-area .md\:p-4 {
-      padding: 0 !important; /* elimina rellenos que roban espacio en impresión */
-    }
-
-    /* Encabezados / tipografías más compactos para que quepa */
-    .printable-area h1, .printable-area h2, .printable-area h3 {
-      margin: 0 0 6px 0 !important;
-      line-height: 1.15 !important;
-    }
-    .printable-area { 
-      font-size: 12px !important;  /* compáctalo un poco */
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      font-size: 12px !important;
       line-height: 1.25 !important;
     }
 
-    /* Imagen del comprobante: se ajusta al espacio disponible */
-    .printable-area img {
-      object-fit: contain !important;
-      max-width: 100% !important;
-      max-height: 100% !important;
-    }
-    /* El contenedor de la imagen se dimensiona dinámicamente en JS */
-    #imgWrap {
-      border: 0 !important;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
-
-    /* Grids a una sola columna para imprimir mejor */
-    .printable-area .grid {
-      display: block !important;
-      gap: 2mm !important;
-      margin: 2mm 0 !important;
-    }
-    .printable-area .grid > * {
-      break-inside: avoid;
-      page-break-inside: avoid;
-      margin-bottom: 2mm !important;
-    }
-
-    /* Quita botones/acciones dentro del detalle si quedaran visibles */
-    .printable-area button,
-    .printable-area a[href^="#/"],
-    .printable-area .no-print {
-      display: none !important;
-    }
-
-    /* Colores sólidos en impresión (mejor contraste) */
-    * {
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-
-    /* escala controlada */
-    .printable-area.shrink {
+    .print-only.shrink {
       transform-origin: top left !important;
       transform: scale(var(--print-scale, 1)) !important;
-    }
-
-    /* más compacto aún (solo si aplicamos shrink) */
-    .printable-area.shrink {
       letter-spacing: 0 !important;
     }
-    .printable-area.shrink .grid > * { margin-bottom: 1mm !important; }
-    .printable-area.shrink h1,
-    .printable-area.shrink h2,
-    .printable-area.shrink h3 { margin-bottom: 4px !important; }
 
-    /* clamp de observaciones para evitar desbordes (ajusta el # de líneas) */
-    #observaciones.clamp-print {
-      display: -webkit-box !important;
-      -webkit-line-clamp: 8;
-      -webkit-box-orient: vertical;
-      overflow: hidden !important;
-    }
+    /* Compactaciones suaves */
+    .print-only .grid { display: block !important; gap: 2mm !important; margin: 2mm 0 !important; }
+    .print-only .grid > * { margin-bottom: 2mm !important; break-inside: avoid; page-break-inside: avoid; }
+    .print-only h1, .print-only h2, .print-only h3 { margin: 0 0 6px 0 !important; line-height: 1.15 !important; }
+
+    /* Imagen: ajusta al espacio disponible (JS limita max-height) */
+    .print-only img { object-fit: contain !important; max-width: 100% !important; height: auto !important; }
+
+    /* Clamp observaciones si hace falta */
+    #observaciones.clamp-print { display: -webkit-box !important; -webkit-line-clamp: 8; -webkit-box-orient: vertical; overflow: hidden !important; }
   }
   `;
   document.head.appendChild(style);
@@ -191,39 +130,32 @@ export default {
       btnEliminar: $('#btn-eliminar'),
     };
 
-    function mmToPx(mm) {
-      // 96dpi ≈ 3.78 px/mm (suficientemente preciso para layout de impresión)
-      return mm * 3.78;
-    }
-    function fitPrintableToA4Once() {
-      const el = refs.card; if (!el) return;
-
-      // A4: 297mm alto total, márgenes: 12mm arriba + 12mm abajo => 273mm útiles
-      const usableHeightPx = mmToPx(297 - 12 - 12);
-
-      // quitamos transform por si quedó de una impresión previa
+    function fitToA4(el) {
+      // Altura útil A4 con márgenes de 12mm
+      const usableHeightPx = 3.78 * (297 - 12 - 12); // ≈ 273mm * 3.78
+      // Quita escalados previos
       el.classList.remove('shrink');
       el.style.removeProperty('--print-scale');
 
-      // calcula espacio disponible para la imagen restando el contenido de texto
-      const { imgWrap, img } = refs;
-      if (!imgWrap.classList.contains('hidden')) {
+      // Si tiene imagen, limita su alto para que el conjunto quepa
+      const imgWrap = el.querySelector('#imgWrap');
+      const img = el.querySelector('#img');
+      if (imgWrap && !imgWrap.classList.contains('hidden') && img) {
         img.style.maxHeight = '';
-        const cardHeightWithoutImg = el.getBoundingClientRect().height - imgWrap.getBoundingClientRect().height;
-        const remaining = usableHeightPx - cardHeightWithoutImg;
+        // mide sin restricción
+        const hWithoutImg = el.getBoundingClientRect().height - imgWrap.getBoundingClientRect().height;
+        const remaining = usableHeightPx - hWithoutImg;
         img.style.maxHeight = remaining > 0 ? `${remaining}px` : '0px';
       }
 
-      // medimos altura real del contenido imprimible tras ajustar la imagen
-      const rect = el.getBoundingClientRect();
-      const currentHeight = rect.height;
-
-      if (currentHeight > usableHeightPx) {
-        const scale = Math.max(0.6, Math.min(1, usableHeightPx / currentHeight));
+      // Recalcula altura total
+      const current = el.getBoundingClientRect().height;
+      if (current > usableHeightPx) {
+        const scale = Math.max(0.6, Math.min(1, usableHeightPx / current));
         el.style.setProperty('--print-scale', String(scale));
         el.classList.add('shrink');
 
-        // como último recurso, clampa observaciones
+        // último recurso: clampa observaciones
         const obs = el.querySelector('#observaciones');
         if (obs) obs.classList.add('clamp-print');
       } else {
@@ -232,18 +164,26 @@ export default {
       }
     }
 
-    function resetPrintableScale() {
-      const el = refs.card; if (!el) return;
-      el.classList.remove('shrink');
-      el.style.removeProperty('--print-scale');
-      const obs = el.querySelector('#observaciones');
-      if (obs) obs.classList.remove('clamp-print');
-      refs.img.style.removeProperty('max-height');
-    }
+    function printDetail(refs) {
+      // 1) Clona la tarjeta
+      const clone = refs.card.cloneNode(true);
+      clone.id = 'print-card';
+      clone.classList.add('print-only'); // <- clave para @media print
+      document.body.appendChild(clone);
 
-    // hooks de impresión del navegador
-    window.addEventListener('beforeprint', fitPrintableToA4Once);
-    window.addEventListener('afterprint', resetPrintableScale);
+      // 2) Ajusta a A4
+      fitToA4(clone);
+
+      // 3) Lanza impresión y limpia después
+      const cleanup = () => {
+        try { document.body.removeChild(clone); } catch {}
+        window.removeEventListener('afterprint', cleanup);
+      };
+      window.addEventListener('afterprint', cleanup);
+
+      // Pequeño reflow antes de abrir el diálogo
+      requestAnimationFrame(() => setTimeout(() => window.print(), 0));
+    }
 
     async function load() {
       const snap = await getDoc(doc(db, 'transferencias', id));
@@ -298,11 +238,7 @@ export default {
         await load();
       };
       refs.btnImprimir.onclick = () => {
-        fitPrintableToA4Once();
-        // Asegura reflow (raf+timeout) antes del print dialog
-        requestAnimationFrame(() => {
-          setTimeout(() => window.print(), 0);
-        });
+        printDetail(refs);
       };
       refs.btnEliminar.onclick = async () => {
         if (!confirm('¿Eliminar este registro?')) return;
