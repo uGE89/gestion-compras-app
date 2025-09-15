@@ -139,12 +139,12 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity
     import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { collection, addDoc, serverTimestamp, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+    import { toNio } from './export_utils.js';
 
     // --- 1. ESTADO Y CONSTANTES GLOBALES ---
     let userId = null, currentImageUrl = null;
     let alegraContactsCache = [], alegraCategoriesCache = [];
     let isDataUnsaved = false; //
-    const USD_TO_NIO_RATE = 36.6;
     const accountMappingsArray = [
                         { id: 5, name: "Ahorro Dólares CEF", color: "#388E3C", moneda: "USD" },
                         { id: 4, name: "Ahorro Dólares EFV", color: "#388E3C", moneda: "USD" },
@@ -700,7 +700,7 @@ function resetUI() {
             createdAt: serverTimestamp(),
         };
         transferData.cantidadNIO = transferData.moneda === 'USD' 
-            ? transferData.cantidad * USD_TO_NIO_RATE 
+            ? toNio(transferData.cantidad, transferData.moneda)
             : transferData.cantidad;
         
         return transferData;

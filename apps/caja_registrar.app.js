@@ -6,6 +6,7 @@ import {
   collection, addDoc, serverTimestamp, getDocs, query, where
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+import { toNio } from '../export_utils.js';
 
 export default {
   async mount(container) {
@@ -54,7 +55,6 @@ export default {
     `;
 
     // ---------- Estado ----------
-    const USD_TO_NIO_RATE = 36.6;
     const accountMappingsArray = [
       { id: 5,  name: "Ahorro Dólares CEF", color: "#388E3C", moneda: "USD" },
       { id: 4,  name: "Ahorro Dólares EFV", color: "#388E3C", moneda: "USD" },
@@ -506,7 +506,7 @@ export default {
         userId: userId,
         createdAt: serverTimestamp(),
       };
-      obj.cantidadNIO = obj.moneda === 'USD' ? obj.cantidad * USD_TO_NIO_RATE : obj.cantidad;
+      obj.cantidadNIO = toNio(obj.cantidad, obj.moneda);
       return obj;
     }
 

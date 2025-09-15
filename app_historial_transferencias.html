@@ -76,6 +76,7 @@
     import { auth, db } from './firebase-init.js';
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { collection, onSnapshot, doc, deleteDoc, query, orderBy, serverTimestamp, getDoc, updateDoc, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { toNio } from './export_utils.js';
 
     function initHistoryApp() {
         const transfersCollection = collection(db, 'transferencias');
@@ -86,7 +87,6 @@
         let alegraContactsCache = [];
         let alegraCategoriesCache = [];
         let allTransfers = [];
-        const USD_TO_NIO_RATE = 36.6;
                     const accountMappingsArray = [
                         { id: 5, name: "Ahorro Dólares CEF", color: "#388E3C", moneda: "USD" },
                         { id: 4, name: "Ahorro Dólares EFV", color: "#388E3C", moneda: "USD" },
@@ -188,7 +188,7 @@
                     updatedAt: serverTimestamp(),
                     userId: userId,
                 };
-                transferData.cantidadNIO = transferData.moneda === 'USD' ? transferData.cantidad * USD_TO_NIO_RATE : transferData.cantidad;
+                transferData.cantidadNIO = toNio(transferData.cantidad, transferData.moneda);
                 
                 const docRef = doc(db, transfersCollection.path, docId);
                 const isInternal = form.querySelector('#internal-transfer-toggle')?.checked;
@@ -269,7 +269,7 @@
                     const editButtonIcon = hasMirror ? 'visibility' : 'edit';
                     const editButtonClass = hasMirror ? 'view-btn bg-sky-100 hover:bg-sky-200 text-sky-800' : 'edit-btn bg-blue-100 hover:bg-blue-200 text-blue-800';
                     const formattedDate = t.fecha ? new Date(t.fecha + 'T00:00:00').toLocaleDateString('es-ES') : 'N/A';
-                    const nioAmount = t.moneda === 'USD' ? (t.cantidad || 0) * USD_TO_NIO_RATE : (t.cantidad || 0);
+                    const nioAmount = toNio(t.cantidad || 0, t.moneda);
                     const amountHtml = t.moneda === 'USD' ? `<span class="font-bold ${typeColor}">${(t.cantidad || 0).toFixed(2)} USD (C$${nioAmount.toFixed(2)})</span>` : `<span class="font-bold ${typeColor}">C$${nioAmount.toFixed(2)}</span>`;
                     
                     let extraInfoHtml = '';

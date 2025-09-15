@@ -8,6 +8,8 @@ import { ref, uploadBytes, getDownloadURL }
 import { ItemsEditor } from './components/items_editor.js';
 const COT_COLLECTION = 'cotizaciones_analizadas';
 import { associateItemsBatch, persistMappingsForItems } from './lib/associations.js';
+import { parseNumber } from '../export_utils.js';
+import { DEFAULT_EXCHANGE_RATE } from '../constants.js';
 
 
 
@@ -20,7 +22,6 @@ export default {
     const rfqId = params.get('rfq') || crypto.randomUUID(); // permite pasar ?rfq=...
 
     const $ = (s,r=document)=>r.querySelector(s);
-    const parseF = v => typeof v==='number'?v:parseFloat(String(v).replace(/,/g,''))||0;
     const toast = (m,t='success')=>{
       let tc=document.getElementById('toast-container');
       if(!tc){tc=document.createElement('div');tc.id='toast-container';tc.className='fixed bottom-4 right-4 z-50';document.body.appendChild(tc);}
@@ -119,7 +120,7 @@ export default {
       container: itemsMount,
       productCatalog,
       initialIVA: 0,     // usualmente cotiza sin IVA
-      initialTC: 1,
+      initialTC: DEFAULT_EXCHANGE_RATE,
       initialTotalAI: 0,
       onChange: ()=>{}
     });
@@ -160,11 +161,11 @@ export default {
           $('#moneda').value    = ai.moneda || 'MXN';
           $('#tc').value        = ai.tipo_cambio || 1;
 
-          const baseItems = (ai.items || []).map(raw => {
-            const cant  = parseF(raw.cantidad);
-            const total = parseF(raw.total_linea);
+      const baseItems = (ai.items || []).map(raw => {
+            const cant  = parseNumber(raw.cantidad);
+            const total = parseNumber(raw.total_linea);
             const uxp   = 1;
-            const punit = raw.precio_unit != null ? parseF(raw.precio_unit)
+            const punit = raw.precio_unit != null ? parseNumber(raw.precio_unit)
                           : (cant*uxp>0 ? total/(cant*uxp) : 0);
             return {
               descripcion_factura: raw.descripcion,
@@ -213,7 +214,7 @@ export default {
         fecha: $('#fecha').value || null,
         vigencia: $('#vigencia').value || null,
         moneda: $('#moneda').value || 'MXN',
-        tipo_cambio: parseF($('#tc').value)||1,
+        tipo_cambio: parseNumber($('#tc').value) || DEFAULT_EXCHANGE_RATE,
         notas: $('#notas').value || '',
         items,
         userId, createdAt: serverTimestamp()
