@@ -74,7 +74,7 @@ export default {
           <div class="flex gap-2">
             <a id="btn-editar" class="px-3 py-2 bg-blue-600 text-white rounded-lg">Editar</a>
             <button id="btn-aprobar" class="px-3 py-2 bg-emerald-600 text-white rounded-lg hidden">Aprobar</button>
-            <a id="btn-transferir" class="px-3 py-2 bg-violet-600 text-white rounded-lg">Transferir</a>
+            <a id="btn-transferir" href="#" class="px-3 py-2 bg-violet-600 text-white rounded-lg">Transferir</a>
             <button id="btn-imprimir" class="px-3 py-2 bg-slate-200 text-slate-800 rounded-lg">Imprimir</button>
             <button id="btn-eliminar" class="px-3 py-2 bg-rose-600 text-white rounded-lg">Eliminar</button>
             <a href="#/caja_historial" class="px-3 py-2 bg-slate-100 text-slate-800 rounded-lg">Volver</a>
@@ -269,7 +269,8 @@ export default {
       };
     }
 
-    refs.btnTransferir.onclick = () => {
+    refs.btnTransferir.onclick = (event) => {
+      event.preventDefault();
       const id = params.get('id');
       if (!id) return;
       location.hash = `#/caja_transferir?id=${encodeURIComponent(id)}`;
