@@ -2,7 +2,7 @@
 
 // --- Importaciones de Firebase ---
 import { FIREBASE_BASE } from './apps/lib/constants.js';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from `${FIREBASE_BASE}firebase-auth.js`;
+const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } = await import(`${FIREBASE_BASE}firebase-auth.js`);
 
 // --- Variables del Módulo ---
 let auth;

@@ -1,11 +1,11 @@
 // apps/cotizaciones_editar.app.js
 import { FIREBASE_BASE, PDFJS_CDN } from './lib/constants.js';
-import {
+const {
   doc,
   getDoc,
   updateDoc,
   serverTimestamp
-} from `${FIREBASE_BASE}firebase-firestore.js`;
+} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
 import { ItemsEditor } from './components/items_editor.js';
 import { persistMappingsForItems } from './lib/associations.js';
 import { showToast } from './lib/toast.js';

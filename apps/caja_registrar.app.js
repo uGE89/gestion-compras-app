@@ -2,16 +2,16 @@
 // Registrar movimientos de caja (usa colección 'transferencias')
 import { auth, db, storage, firebaseConfig } from '../firebase-init.js';
 import { FIREBASE_BASE, PDFJS_CDN } from './lib/constants.js';
-import { onAuthStateChanged, signInAnonymously } from `${FIREBASE_BASE}firebase-auth.js`;
-import {
+const { onAuthStateChanged, signInAnonymously } = await import(`${FIREBASE_BASE}firebase-auth.js`);
+const {
   collection,
   addDoc,
   serverTimestamp,
   getDocs,
   query,
   where
-} from `${FIREBASE_BASE}firebase-firestore.js`;
-import { ref, uploadBytes, getDownloadURL } from `${FIREBASE_BASE}firebase-storage.js`;
+} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
+const { ref, uploadBytes, getDownloadURL } = await import(`${FIREBASE_BASE}firebase-storage.js`);
 import { toNio } from '../export_utils.js';
 import { showToast } from './lib/toast.js';
 

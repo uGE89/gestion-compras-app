@@ -1,13 +1,13 @@
 // /public/apps/caja_detalle.app.js
 import { db } from '../firebase-init.js';
 import { FIREBASE_BASE } from './lib/constants.js';
-import {
+const {
   doc,
   getDoc,
   updateDoc,
   serverTimestamp,
   deleteDoc
-} from `${FIREBASE_BASE}firebase-firestore.js`;
+} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
 
 function setupA4PrintStyles() {
   if (document.getElementById('print-a4-style')) return;

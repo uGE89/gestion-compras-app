@@ -3,8 +3,8 @@
 
 import { auth, db } from '../firebase-init.js';
 import { FIREBASE_BASE } from './lib/constants.js';
-import { onAuthStateChanged } from `${FIREBASE_BASE}firebase-auth.js`;
-import {
+const { onAuthStateChanged } = await import(`${FIREBASE_BASE}firebase-auth.js`);
+const {
   collection,
   onSnapshot,
   doc,
@@ -19,7 +19,7 @@ import {
   addDoc,
   limit,
   startAfter
-} from `${FIREBASE_BASE}firebase-firestore.js`;
+} = await import(`${FIREBASE_BASE}firebase-firestore.js`);
 import { toNio } from '../export_utils.js';
 import { showToast } from './lib/toast.js';
 
