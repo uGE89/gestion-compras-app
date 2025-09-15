@@ -7,6 +7,8 @@ import { ref, uploadBytes, getDownloadURL }
   from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 import { ItemsEditor } from './components/items_editor.js';
 import { associateItemsBatch, persistMappingsForItems } from './lib/associations.js';
+import { parseNumber } from '../export_utils.js';
+import { DEFAULT_EXCHANGE_RATE } from '../constants.js';
 
 
 
@@ -21,8 +23,6 @@ export default {
 
     // ===== Utils =====
     const $  = (sel, root=document) => root.querySelector(sel);
-    const parseLocalFloat = (v) => (typeof v === 'number') ? v :
-      (typeof v === 'string' ? (parseFloat(v.replace(/,/g,'')) || 0) : 0);
 
     function showToast(m,t='success'){
       let tc = document.getElementById('toast-container');
@@ -174,7 +174,7 @@ export default {
       container: calcContainer,
       productCatalog,
       initialIVA: 15,
-      initialTC: 1,
+      initialTC: DEFAULT_EXCHANGE_RATE,
       initialTotalAI: 0,
       onChange: () => {}
     });
@@ -182,7 +182,7 @@ export default {
     // Sincroniza el total escrito a mano con el editor (diferencias/summary)
     const totalInput = $('#total', root);
     totalInput.addEventListener('input', () => {
-      const v = parseLocalFloat(totalInput.value);
+      const v = parseNumber(totalInput.value);
       totalFacturaAI = v;
       itemsEditor.setInvoiceTotal(v); // actualiza "Total Factura (IA)" y recalcula diferencias
     });
@@ -235,7 +235,7 @@ export default {
         const extracted = await getAIDataDirect(base64ForAI, env?.AI_API_KEY);
 
         if (extracted) {
-          totalFacturaAI = parseLocalFloat(extracted.total) || 0;
+          totalFacturaAI = parseNumber(extracted.total) || 0;
           $('#fecha', root).value = extracted.fecha || '';
           $('#proveedor', root).value = extracted.proveedor || '';
           $('#numero_factura', root).value = extracted.numero_factura || '';
@@ -246,9 +246,9 @@ export default {
 
           const baseItems = (extracted.items || []).map(it => ({
             descripcion_factura: it.descripcion,
-            cantidad_factura: parseLocalFloat(it.cantidad),
+            cantidad_factura: parseNumber(it.cantidad),
             unidades_por_paquete: 1,
-            total_linea_base: parseLocalFloat(it.total_linea),
+            total_linea_base: parseNumber(it.total_linea),
             clave_proveedor: it.clave_proveedor || null,
             recibido: false
           }));
@@ -305,10 +305,10 @@ export default {
       }
 
       const ivaPercent = parseFloat($('#ie-iva', root)?.value || '0');
-      const tipoCambio = parseFloat($('#ie-tc', root)?.value || '1');
+      const tipoCambio = parseNumber($('#ie-tc', root)?.value || DEFAULT_EXCHANGE_RATE);
 
       // Asegura el total a partir del input
-      totalFacturaAI = parseLocalFloat($('#total', root).value);
+      totalFacturaAI = parseNumber($('#total', root).value);
 
       // Final items desde el editor
       const rawItems = itemsEditor.getItems();

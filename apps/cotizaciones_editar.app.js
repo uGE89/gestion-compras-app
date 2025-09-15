@@ -4,6 +4,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { ItemsEditor } from './components/items_editor.js';
 import { persistMappingsForItems } from './lib/associations.js';
+import { parseNumber } from '../export_utils.js';
+import { DEFAULT_EXCHANGE_RATE } from '../constants.js';
 const COT_COLLECTION = 'cotizaciones_analizadas';
 
 const MAP_COLLECTION = 'mapeo_articulos';
@@ -16,7 +18,6 @@ export default {
     if (!id) { container.innerHTML = '<div class="p-6 text-slate-500">ID no especificado.</div>'; return; }
 
     const $ = (s, r=document)=> r.querySelector(s);
-    const parseNum = v => (typeof v==='number')? v : (parseFloat(String(v).replace(/,/g,''))||0);
 
     function showToast(m,t='success'){
       let tc=document.getElementById('toast-container');
@@ -157,7 +158,7 @@ const itemsEditor = ItemsEditor({
   container: $('#calc', root),
   productCatalog,
   initialIVA: Number(data.iva_aplicado ?? 0),
-  initialTC: Number(data.tipo_cambio_aplicado ?? 1),
+  initialTC: Number(data.tipo_cambio_aplicado ?? DEFAULT_EXCHANGE_RATE),
   initialTotalAI: Number(data.total || 0),
   onChange: () => {}
 });
@@ -195,7 +196,7 @@ itemsEditor.setInvoiceTotal(Number(data.total || 0));
           if (extracted.proveedor) $('#proveedor', root).value = extracted.proveedor;
           if (extracted.numero_cotizacion) $('#folio', root).value = extracted.numero_cotizacion;
 
-          const totalDoc = parseNum(extracted.total);
+          const totalDoc = parseNumber(extracted.total);
           if (totalDoc>0) { $('#total', root).value = totalDoc.toFixed(2); itemsEditor.setInvoiceTotal(totalDoc); }
 
           // anexa ítems + mapeo
@@ -203,9 +204,9 @@ itemsEditor.setInvoiceTotal(Number(data.total || 0));
             const assoc = await findAssociation(it.descripcion);
             return {
               descripcion_factura: it.descripcion,
-              cantidad_factura: parseNum(it.cantidad),
+              cantidad_factura: parseNumber(it.cantidad),
               unidades_por_paquete: 1,
-              total_linea_base: parseNum(it.total_linea),
+              total_linea_base: parseNumber(it.total_linea),
               clave_proveedor: it.clave_proveedor || null,
               clave_catalogo: assoc ? assoc.clave_catalogo : null,
               desc_catalogo: assoc ? assoc.desc_catalogo : null,

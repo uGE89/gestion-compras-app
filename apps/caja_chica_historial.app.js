@@ -8,6 +8,7 @@ import {
   serverTimestamp, getDoc, updateDoc, where, getDocs, addDoc,
   limit, startAfter
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { toNio } from '../export_utils.js';
 
 export default {
   async mount(container, { appState, params }) {
@@ -24,7 +25,6 @@ export default {
       (qpNum     != null && Number.isFinite(qpNum))   ? qpNum     :
       (Number.isFinite(Number(appState?.pettyCashBankId)) ? Number(appState.pettyCashBankId) : 1);
 
-    const USD_TO_NIO_RATE = 36.6;
 
     // Mapeo rápido para mostrar el nombre en UI
     const accountMappingsArray = [
@@ -256,7 +256,7 @@ export default {
         if (!Number.isNaN(nio)) return nio;
       }
       if (!legacy) return 0;
-      return (t.moneda === 'USD') ? legacy * USD_TO_NIO_RATE : legacy;
+      return toNio(legacy, t.moneda);
     }
 
     function applyClientFilters(docs){
