@@ -171,18 +171,29 @@ export default {
       clone.classList.add('print-only'); // <- clave para @media print
       document.body.appendChild(clone);
 
-      // 2) Ajusta a A4
-      fitToA4(clone);
+      // 2) Referencia a la imagen clonada
+      const img = clone.querySelector('#img');
 
-      // 3) Lanza impresión y limpia después
-      const cleanup = () => {
-        try { document.body.removeChild(clone); } catch {}
-        window.removeEventListener('afterprint', cleanup);
+      // 3) Ajusta a A4, imprime y limpia
+      const doFitAndPrint = () => {
+        fitToA4(clone);
+
+        const cleanup = () => {
+          try { document.body.removeChild(clone); } catch {}
+          window.removeEventListener('afterprint', cleanup);
+        };
+        window.addEventListener('afterprint', cleanup);
+
+        // Pequeño reflow antes de abrir el diálogo
+        requestAnimationFrame(() => setTimeout(() => window.print(), 0));
       };
-      window.addEventListener('afterprint', cleanup);
 
-      // Pequeño reflow antes de abrir el diálogo
-      requestAnimationFrame(() => setTimeout(() => window.print(), 0));
+      if (img && !img.complete) {
+        img.addEventListener('load', doFitAndPrint, { once: true });
+        img.addEventListener('error', doFitAndPrint, { once: true });
+      } else {
+        doFitAndPrint();
+      }
     }
 
     async function load() {
