@@ -3,6 +3,7 @@ export const registry = {
   'creador_pedido': () => import('../apps/creador_pedido.app.js'),
   'detalles': () => import('../apps/detalles_articulo.app.js'),
   'mis_pedidos': () => import('../apps/mis_pedidos.app.js'),
+  'caja_chica_historial': () => import('../apps/caja_chica_historial.app.js'),
   'caja_historial': () => import('../apps/caja_historial.app.js'),
   'caja_detalle': () => import('../apps/caja_detalle.app.js'),
   'caja_editar':  () => import('../apps/caja_editar.app.js'),
