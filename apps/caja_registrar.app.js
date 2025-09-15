@@ -1,7 +1,7 @@
 // /public/apps/caja_registrar.app.js
 // Registrar movimientos de caja (usa colección 'transferencias')
 import { auth, db, storage, firebaseConfig } from '../firebase-init.js';
-import { FIREBASE_BASE } from './lib/constants.js';
+import { FIREBASE_BASE, PDFJS_CDN } from './lib/constants.js';
 import { onAuthStateChanged, signInAnonymously } from `${FIREBASE_BASE}firebase-auth.js`;
 import {
   collection,
@@ -206,13 +206,13 @@ export default {
       if (!window.pdfjsLib) {
         await new Promise((res, rej) => {
           const s = document.createElement('script');
-          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js';
+          s.src = `${PDFJS_CDN}pdf.min.js`;
           s.onload = res; s.onerror = rej;
           document.head.appendChild(s);
         });
       }
       window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js';
+        `${PDFJS_CDN}pdf.worker.min.js`;
 
       const ab = await file.arrayBuffer();
       const pdf = await window.pdfjsLib.getDocument(new Uint8Array(ab)).promise;

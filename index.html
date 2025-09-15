@@ -10,7 +10,6 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .nav-link.active {
@@ -88,15 +87,36 @@
 <script type="module">
     import { appState, hydrateDrafts, savePedidoDraft, saveCotizacionDraft } from './state.js';
     import { auth, db as firestoreDb, storage as firebaseStorage } from './firebase-init.js';
-    import { FIREBASE_BASE } from './apps/lib/constants.js';
+    import { FIREBASE_BASE, PDFJS_CDN } from './apps/lib/constants.js';
     import { onAuthStateChanged, signOut } from `${FIREBASE_BASE}firebase-auth.js`;
     import { loadContent } from './app_loader.js';
     import { createRouter } from './framework/router-lite.js';
     import { registry } from './framework/registry.js';
     import { env } from './env.js';
+
+
+
+    const ensurePdfWorker = () => {
+        if (window.pdfjsLib) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN}pdf.worker.min.js`;
+        }
+    };
+
+    const existingPdfScript = document.querySelector(`script[src="${PDFJS_CDN}pdf.min.js"]`);
+    if (existingPdfScript) {
+        if (window.pdfjsLib) {
+            ensurePdfWorker();
+        } else {
+            existingPdfScript.addEventListener('load', ensurePdfWorker, { once: true });
+        }
+    } else {
+        const pdfScript = document.createElement('script');
+        pdfScript.src = `${PDFJS_CDN}pdf.min.js`;
+        pdfScript.addEventListener('load', ensurePdfWorker, { once: true });
+        document.head.appendChild(pdfScript);
+    }
+
     
-
-
     // Registro del Service Worker para caché de la app (sin cambios funcionales)
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
