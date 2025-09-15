@@ -133,6 +133,14 @@
     const loadingMessage = document.getElementById('loading-message');
     const menuToggleBtn = document.getElementById('menu-toggle-btn');
     const navMenu = document.getElementById('nav-menu');
+    const topNavBar = document.querySelector('#app-shell nav');
+    const bottomNav = document.querySelector('.bottom-nav');
+    const initialParams = new URLSearchParams((window.location.hash.split('?')[1]) || '');
+    if (initialParams.get('solo') === '1' && initialParams.get('app') === 'jefe_caja') {
+      topNavBar?.classList.add('hidden');
+      bottomNav?.classList.add('hidden');
+      document.body.classList.add('solo-app-mode');
+    }
 
     const BIGQUERY_API_URL = 'https://script.google.com/macros/s/AKfycbx6mWhvloaWRprnYFlEQ5iAHh4yMlwsHYk4x-iKXiDZeBX2JglqcOv87pUpwym0q1g_/exec';
     const CACHE_KEY = 'catalogData';
@@ -143,10 +151,26 @@
     const router = createRouter({
   container: contentContainer,
   registry,
-  deps: { appState, auth, db: firestoreDb, storage: firebaseStorage, env },  
+  deps: { appState, auth, db: firestoreDb, storage: firebaseStorage, env },
   fallbackLoadContent: async (routeOrFile) => {
     const file = routeOrFile.endsWith('.html') ? routeOrFile : 'fallback.html';
     await loadContent(file, contentContainer);
+  },
+  soloApp: {
+    id: 'jefe_caja',
+    flagParam: 'solo',
+    flagValue: '1',
+    appParam: 'app',
+    onEnter: () => {
+      topNavBar?.classList.add('hidden');
+      bottomNav?.classList.add('hidden');
+      document.body.classList.add('solo-app-mode');
+    },
+    onExit: () => {
+      topNavBar?.classList.remove('hidden');
+      bottomNav?.classList.remove('hidden');
+      document.body.classList.remove('solo-app-mode');
+    }
   }
 });
 
