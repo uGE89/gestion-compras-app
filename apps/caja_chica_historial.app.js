@@ -183,23 +183,23 @@ export default {
       setTimeout(()=>div.remove(), 2500);
     }
 
-    function buildPageQuery({ startAfterDoc = null }) {
-      let qy = query(
+    function buildPageQuery() {
+      // Para NO requerir índice compuesto:
+      // - Solo igualdad por bankAccountId
+      // - Sin orderBy('fecha')
+      // - Sin where('status')
+      // Luego ordenamos/filtramos por fecha y status en cliente.
+      const qy = query(
         transfersCollection,
-        where('bankAccountId', '==', Number(PETTY_CASH_BANK_ID)), // << Forzado a caja chica
-        orderBy('fecha', 'desc'),
+        where('bankAccountId', '==', Number(PETTY_CASH_BANK_ID)),
         limit(PAGE_SIZE)
       );
-      const status = filterStatus.value;
-      if (status) qy = query(qy, where('status', '==', status));
-      if (startAfterDoc) qy = query(qy, startAfter(startAfterDoc));
       return qy;
     }
 
     async function attachPage(page) {
       if (currentUnsub) { currentUnsub(); currentUnsub = null; }
-      const startAfterDoc = page > 0 ? pageCursors[page - 1]?.lastDoc : null;
-      const qy = buildPageQuery({ startAfterDoc });
+      const qy = buildPageQuery();
 
       historyLoader.classList.remove('hidden');
       currentUnsub = onSnapshot(qy, (snap) => {
@@ -253,13 +253,19 @@ export default {
     }
 
     function applyClientFilters(docs){
+      // Aplica filtro de estado SOLO en cliente (evita índices)
+      const statusFilter = (filterStatus.value || '').trim();
+      const byStatus = statusFilter
+        ? docs.filter(t => (t.status || '') === statusFilter)
+        : docs.slice();
+
       // Un solo día. Si no hay valor, lo forzamos a HOY.
       const sel = filterDate.value;
       const dayStart = sel ? new Date(sel + 'T00:00:00') : null;
       const dayEnd   = sel ? new Date(sel + 'T23:59:59') : null;
       const term      = (generalSearch.value || '').trim().toLowerCase();
 
-      return docs.filter(t => {
+      const dateAndText = byStatus.filter(t => {
         // Fecha
         const dateValue = t.fecha ? new Date(t.fecha + 'T00:00:00')
           : (t.createdAt?.toDate ? t.createdAt.toDate() : null);
@@ -278,6 +284,15 @@ export default {
         }
         return true;
       });
+
+      // Orden por fecha DESC en cliente (evita orderBy compuesto)
+      dateAndText.sort((a, b) => {
+        const da = a.fecha ? new Date(a.fecha + 'T00:00:00') : (a.createdAt?.toDate ? a.createdAt.toDate() : 0);
+        const db = b.fecha ? new Date(b.fecha + 'T00:00:00') : (b.createdAt?.toDate ? b.createdAt.toDate() : 0);
+        return db - da;
+      });
+
+      return dateAndText;
     }
 
     function renderWithClientFilters(){
