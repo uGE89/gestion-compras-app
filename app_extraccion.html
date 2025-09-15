@@ -136,7 +136,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity
     
     <script type="module">
     import { auth, db, storage, firebaseConfig } from './firebase-init.js';
-    import { FIREBASE_BASE, PDFJS_CDN } from './apps/lib/constants.js';
+    import { FIREBASE_BASE, PDFJS_CDN, buildAiUrl, GEMINI_FLASH } from './apps/lib/constants.js';
     import { onAuthStateChanged, signInAnonymously } from `${FIREBASE_BASE}firebase-auth.js`;
     import { collection, addDoc, serverTimestamp, getDocs, query, where } from `${FIREBASE_BASE}firebase-firestore.js`;
     import { ref, uploadBytes, getDownloadURL } from `${FIREBASE_BASE}firebase-storage.js`;
@@ -954,7 +954,7 @@ Si **NO** es un estado de cuenta con columnas (comprobantes, tickets, vouchers, 
 
     async function getAIData(base64Data, mimeType) {
         const apiKey = firebaseConfig.apiKey;
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`;
+        const apiUrl = buildAiUrl(GEMINI_FLASH) + apiKey;
         const prompt = buildAIPrompt(alegraContactsCache, alegraCategoriesCache);
         const payload = { contents: [{ parts: [ { text: prompt }, { inlineData: { mimeType, data: base64Data } } ] }], generationConfig: { responseMimeType: "application/json" } };
         const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });

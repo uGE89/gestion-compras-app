@@ -1,5 +1,5 @@
 // apps/cotizaciones_registrar.app.js
-import { FIREBASE_BASE, PDFJS_CDN } from './lib/constants.js';
+import { FIREBASE_BASE, PDFJS_CDN, buildAiUrl, GEMINI_FLASH } from './lib/constants.js';
 import {
   collection,
   addDoc,
@@ -28,7 +28,7 @@ export default {
     // === IA (igual que compras, pero con prompt para cotización)
     async function getAI(base64, apiKey){
       if(!apiKey){ showToast('Falta AI_API_KEY','error'); return null; }
-      const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+      const url = buildAiUrl(GEMINI_FLASH) + apiKey;
       const parts=[{text:"Analiza las imágenes de una COTIZACIÓN. Devuelve JSON con { proveedor, fecha (YYYY-MM-DD), vigencia (opcional), moneda (MXN/USD u otra), tipo_cambio (num, opcional), items:[{descripcion, cantidad, total_linea (opcional), precio_unit (opcional), clave_proveedor}] }. Si falta un dato usa null. No expliques, solo JSON."}];
       base64.forEach(b=>parts.push({inlineData:{mimeType:"image/jpeg", data:b}}));
       try{

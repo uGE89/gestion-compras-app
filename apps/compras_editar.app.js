@@ -1,5 +1,5 @@
 // apps/compras_editar.app.js
-import { FIREBASE_BASE, PDFJS_CDN } from './lib/constants.js';
+import { FIREBASE_BASE, PDFJS_CDN, buildAiUrl, GEMINI_FLASH } from './lib/constants.js';
 import {
   collection,
   doc,
@@ -45,7 +45,7 @@ export default {
     // ===== IA directa (temporal en frontend) =====
     async function getAIDataDirect(base64Array, apiKey) {
       if (!apiKey) { showToast('Falta env.AI_API_KEY', 'error'); return null; }
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+      const apiUrl = buildAiUrl(GEMINI_FLASH) + apiKey;
       const parts = [
         { text: "Analiza las imágenes de la factura (puede ser multipágina). Devuelve JSON con: fecha (YYYY-MM-DD), proveedor, numero_factura, total (número) e items[{ descripcion, cantidad, total_linea, clave_proveedor }]. Usa null si falta." }
       ];
