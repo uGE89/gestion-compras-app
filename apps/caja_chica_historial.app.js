@@ -76,12 +76,8 @@ export default {
               <input id="general-search" type="text" placeholder="Buscar..." class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2">
             </div>
             <div class="md:col-span-2">
-              <label class="block text-sm font-medium text-slate-700">Fecha inicio</label>
-              <input id="filter-start-date" type="date" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2">
-            </div>
-            <div class="md:col-span-2">
-              <label class="block text-sm font-medium text-slate-700">Fecha fin</label>
-              <input id="filter-end-date" type="date" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2">
+              <label class="block text-sm font-medium text-slate-700">Fecha</label>
+              <input id="filter-date" type="date" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm p-2">
             </div>
             <!-- Banco fijo oculto, solo mostramos etiqueta -->
             <div class="md:col-span-2">
@@ -95,9 +91,6 @@ export default {
                 <option value="approved">Aprobado</option>
                 <option value="pending_review">Pendiente</option>
               </select>
-            </div>
-            <div class="md:col-span-1 flex items-end">
-              <button id="recalc-btn" class="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg">Recalcular saldo</button>
             </div>
           </div>
 
@@ -138,11 +131,9 @@ export default {
     const prevBtn       = $('#prevPage');
     const nextBtn       = $('#nextPage');
     const pageLabel     = $('#pageLabel');
-    const filterStartDate = $('#filter-start-date');
-    const filterEndDate   = $('#filter-end-date');
+    const filterDate      = $('#filter-date');
     const filterStatus    = $('#filter-status');
     const generalSearch   = $('#general-search');
-    const recalcBtn       = $('#recalc-btn');
     const totInEl         = $('#tot-in');
     const totOutEl        = $('#tot-out');
     const totBalEl        = $('#tot-balance');
@@ -160,7 +151,9 @@ export default {
     let alegraContactsCache = [];
     let alegraCategoriesCache = [];
 
-    const PAGE_SIZE = 20;
+    // Buscamos que “quepa el día” en una página.
+    // Si tu día típico trae más de 500 movimientos, subilo aquí.
+    const PAGE_SIZE = 500;
     let pageIndex = 0;
     let pageCursors = [];
     let currentUnsub = null;
@@ -233,12 +226,20 @@ export default {
         alegraContactsCache = contactsSnap.docs.map(d => ({id:d.id, ...d.data()}));
         alegraCategoriesCache = categoriesSnap.docs.map(d => ({id:d.id, ...d.data()}));
 
+        // Fecha por defecto: HOY
+        if (!filterDate.value) {
+          const tz = new Date();
+          const y = tz.getFullYear();
+          const m = String(tz.getMonth()+1).padStart(2,'0');
+          const d = String(tz.getDate()).padStart(2,'0');
+          filterDate.value = `${y}-${m}-${d}`;
+        }
+
         pageIndex = 0;
         pageCursors = [];
         await attachPage(pageIndex);
-
-        // Primer cálculo de totales globales (sin filtros = saldo total)
-        await recalcTotalsGlobal();
+        // Los totales siempre salen de lo visible (renderWithClientFilters)
+        renderWithClientFilters();
       } catch(err){
         console.error(err);
         toast('Error al cargar datos.', 'error');
@@ -252,16 +253,18 @@ export default {
     }
 
     function applyClientFilters(docs){
-      const startDate = filterStartDate.value ? new Date(filterStartDate.value + 'T00:00:00') : null;
-      const endDate   = filterEndDate.value ? new Date(filterEndDate.value   + 'T23:59:59') : null;
+      // Un solo día. Si no hay valor, lo forzamos a HOY.
+      const sel = filterDate.value;
+      const dayStart = sel ? new Date(sel + 'T00:00:00') : null;
+      const dayEnd   = sel ? new Date(sel + 'T23:59:59') : null;
       const term      = (generalSearch.value || '').trim().toLowerCase();
 
       return docs.filter(t => {
         // Fecha
         const dateValue = t.fecha ? new Date(t.fecha + 'T00:00:00')
           : (t.createdAt?.toDate ? t.createdAt.toDate() : null);
-        if (startDate && dateValue && dateValue < startDate) return false;
-        if (endDate   && dateValue && dateValue > endDate)   return false;
+        if (dayStart && dateValue && dateValue < dayStart) return false;
+        if (dayEnd   && dateValue && dateValue > dayEnd)   return false;
 
         // Búsqueda
         if (term){
@@ -280,7 +283,7 @@ export default {
     function renderWithClientFilters(){
       const filtered = applyClientFilters(currentRawDocs);
       renderHistory(filtered);
-      // Totales de la página filtrada (rápido, útil como referencia inmediata)
+      // Totales SIEMPRE sobre lo visible (lista filtrada actual)
       const quickTotals = computeTotals(filtered);
       paintTotals(quickTotals);
     }
@@ -302,76 +305,18 @@ export default {
       totBalEl.textContent = fmt(balance);
     }
 
-    async function recalcTotalsGlobal(){
-      // Recorre TODAS las páginas (bank fijo + estado + fecha), luego aplica búsqueda client-side
-      const status = filterStatus.value || null;
-      const startDate = filterStartDate.value ? new Date(filterStartDate.value + 'T00:00:00') : null;
-      const endDate   = filterEndDate.value ? new Date(filterEndDate.value   + 'T23:59:59') : null;
-
-      let qy = query(
-        transfersCollection,
-        where('bankAccountId', '==', Number(PETTY_CASH_BANK_ID)),
-        orderBy('fecha', 'desc'),
-        limit(300) // batch razonable
-      );
-      if (status) qy = query(qy, where('status', '==', status));
-
-      let all = [];
-      let last = null;
-      while (true){
-        const snap = await getDocs(last ? query(qy, startAfter(last)) : qy);
-        const docs = snap.docs;
-        if (!docs.length) break;
-        all.push(...docs.map(d => ({ id: d.id, ...d.data() })));
-        last = docs[docs.length - 1];
-        // safety break si fuese enorme
-        if (docs.length < 300) break;
-      }
-
-      // Filtro por rango de fechas
-      all = all.filter(t => {
-        const dateValue = t.fecha ? new Date(t.fecha + 'T00:00:00')
-          : (t.createdAt?.toDate ? t.createdAt.toDate() : null);
-        if (startDate && dateValue && dateValue < startDate) return false;
-        if (endDate   && dateValue && dateValue > endDate)   return false;
-        return true;
-      });
-
-      // Aplica búsqueda client-side
-      const term = (generalSearch.value || '').trim().toLowerCase();
-      if (term){
-        all = all.filter(t => {
-          const contact  = alegraContactsCache.find(c => c.id === t.alegraContactId);
-          const category = alegraCategoriesCache.find(c => c.id === t.alegraCategoryId);
-          const haystack = [
-            t.observaciones, t.banco, t.numero_confirmacion, String(t.cantidad),
-            contact?.name, category?.name
-          ].join(' ').toLowerCase();
-          return haystack.includes(term);
-        });
-      }
-
-      const totals = computeTotals(all);
-      paintTotals(totals);
-    }
-
     function updatePagerUI(){
       pageLabel.textContent = `Página ${pageIndex + 1}`;
       const size = pageCursors[pageIndex]?.size ?? 0;
-      prevBtn.disabled = pageIndex === 0;
-      nextBtn.disabled = size < PAGE_SIZE;
+      prevBtn.disabled = true; // normalmente no paginamos si cabe el día
+      nextBtn.disabled = true;
     }
 
     prevBtn.addEventListener('click', () => {
-      if (pageIndex === 0) return;
-      pageIndex -= 1;
-      attachPage(pageIndex);
+      // deshabilitado
     });
     nextBtn.addEventListener('click', () => {
-      const size = pageCursors[pageIndex]?.size ?? 0;
-      if (size < PAGE_SIZE) return;
-      pageIndex += 1;
-      attachPage(pageIndex);
+      // deshabilitado
     });
 
     // Render de tarjetas
@@ -481,33 +426,30 @@ export default {
         showModal('¿Aprobar este registro?', async () => {
           await updateDoc(doc(db, transfersCollection.path, id), { status: 'approved', updatedAt: serverTimestamp() });
           toast('Registro aprobado.', 'success');
-          await recalcTotalsGlobal(); // refleja saldo si el filtro de estado aplica
+          renderWithClientFilters(); // refleja saldo si el filtro de estado aplica
         });
       } else if (btn.classList.contains('delete-btn')) {
         showModal('¿Eliminar este registro?', async () => {
           await deleteDoc(doc(db, transfersCollection.path, id));
           toast('Registro eliminado.', 'success');
-          await recalcTotalsGlobal();
+          renderWithClientFilters();
         });
       }
     });
-
-    // Filtros que NO reconsultan (texto/fechas) → re-render local + recalc global
-    [generalSearch, filterStartDate, filterEndDate].forEach(el => {
-      el?.addEventListener('input', async () => {
+    
+    // Filtros (texto/fecha) → re-render local (totales salen de lo visible)
+    [generalSearch, filterDate].forEach(el => {
+      el?.addEventListener('input', () => {
         renderWithClientFilters();
-        await recalcTotalsGlobal();
       });
     });
-    // Filtros que SÍ cambian el query (estado) → reset paginación + recalc global
+    // Filtro de estado cambia el query (pero totales siguen saliendo del render)
     filterStatus?.addEventListener('change', async () => {
       pageIndex = 0;
       pageCursors = [];
       await attachPage(pageIndex);
-      await recalcTotalsGlobal();
+      renderWithClientFilters();
     });
-
-    recalcBtn.addEventListener('click', recalcTotalsGlobal);
   },
 
   unmount() {}
