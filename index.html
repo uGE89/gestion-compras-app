@@ -454,7 +454,7 @@
             return;
           }
         }
-        await router.mount(route);
+        await router.mount(hash);
         navLinks.forEach(l => l.classList.remove('active'));
         if (navMenu.classList.contains('active')) navMenu.classList.remove('active');
         return;
