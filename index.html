@@ -1,106 +1,135 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Gestión</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        .nav-link.active {
-            background-color: #10b981; /* emerald-500 */
-            color: white;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .spinner { animation: spin 1s linear infinite; border-top-color: transparent; }
-        .nav-menu-mobile { display: none; }
-        .nav-menu-mobile.active { display: flex; }
-        /* --- Visuales nuevos, sin tocar la lógica --- */
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; }
-        /* Oculta el botón hamburguesa y el menú superior en móvil */
-@media (max-width: 767px) {
-  #menu-toggle-btn { display: none !important; }
-  .nav-menu-mobile { display: none !important; } /* aunque tenga .active */
-}
-
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard de Gestión</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .nav-link.active { background-color: #10b981; color: white; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; border-top-color: transparent; }
+    .nav-menu-mobile { display: none; }
+    .nav-menu-mobile.active { display: flex; }
+    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; }
+    @media (max-width: 767px) {
+      #menu-toggle-btn { display: none !important; }
+      .nav-menu-mobile { display: none !important; }
+    }
+  </style>
 </head>
-<body class="bg-slate-100 min-h-screen pb-16 md:pb-0"> <!-- padding-bottom en móvil para no tapar el contenido con la barra inferior -->
-
-    <div id="loading-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <div class="bg-white p-6 rounded-lg shadow-xl flex items-center space-x-4">
-            <div class="spinner w-8 h-8 border-4 border-blue-500 rounded-full"></div>
-            <p id="loading-message" class="text-slate-700 font-medium">Conectando...</p>
-        </div>
+<body class="bg-slate-100 min-h-screen pb-16 md:pb-0">
+  <!-- Loading overlay -->
+  <div id="loading-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white p-6 rounded-lg shadow-xl flex items-center space-x-4">
+      <div class="spinner w-8 h-8 border-4 border-blue-500 rounded-full"></div>
+      <p id="loading-message" class="text-slate-700 font-medium">Conectando...</p>
     </div>
+  </div>
 
-    <div id="app-shell" class="hidden min-h-screen flex flex-col">
-        <!-- Navbar: mismas IDs/clases; solo visual sticky y tamaños táctiles -->
-        <nav class="bg-white shadow-md sticky top-0 z-40">
-            <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center relative">
-                <div class="text-xl font-bold text-slate-800">Mi Empresa V2</div>
-                
-                <div id="nav-menu" class="nav-menu-mobile md:flex flex-grow justify-center space-x-4">
-                    <a href="#/compras_historial" data-page="compras_historial.apps.js" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Compras</a>
-                    <a href="#/caja_registrar" data-page="app_extraccion.html" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Transferencias</a>
-                    <a href="#/creador_pedido" data-page="creador_pedido.apps.js" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Pedidos</a>
-                    <a href="#/cotizaciones_historial" data-page="cotizaciones_historial.apps.js" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Cotizaciones</a>
-                    <a href="#/caja_chica_historial" data-page="caja_chica_historial.app.js" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Cajas</a>
-                    <a href="#/caja_historial" data-page="app_historial_transferencias.html" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Historial Transferencias</a>
-                </div>
+  <!-- App shell -->
+  <div id="app-shell" class="hidden min-h-screen flex flex-col">
+    <!-- Top nav -->
+    <nav class="bg-white shadow-md sticky top-0 z-40">
+      <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center relative">
+        <div class="text-xl font-bold text-slate-800">Mi Empresa V2</div>
 
-                <div class="flex items-center space-x-2">
-                    <button id="refresh-catalog-btn" class="min-h-11 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-md flex items-center" title="Actualizar Historial de Productos" aria-label="Actualizar Historial de Productos">
-                        <span class="material-icons text-base">sync</span>
-                        <span id="refresh-spinner" class="hidden spinner w-4 h-4 ml-2 border-2 rounded-full border-white border-t-transparent"></span>
-                    </button>
-                    <button id="logout-btn" class="min-h-11 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl shadow-md" title="Cerrar Sesión" aria-label="Cerrar Sesión">
-                        <span class="material-icons text-base">logout</span>
-                    </button>
-                    <button id="menu-toggle-btn" class="md:hidden p-2 rounded-md text-slate-700 hover:bg-slate-200" aria-controls="nav-menu" aria-expanded="false" aria-label="Abrir menú de navegación">
-                        <span class="material-icons">menu</span>
-                    </button>
-                </div>
-            </div>
-        </nav>
-        <main id="content-container" class="container mx-auto p-4 md:p-6 flex-grow">
-        </main>
-    </div>
-
-    <!-- Barra inferior para móvil (no afecta la lógica; enlaces por hash) -->
-    <nav class="bottom-nav md:hidden bg-white border-t border-slate-200">
-        <div class="grid grid-cols-6 text-xs text-slate-600">
-            <a class="flex flex-col items-center py-2" href="#/compras_historial" data-page="compras_historial.apps.js"><span class="material-icons">shopping_cart</span><span>Compras</span></a>
-            <a class="flex flex-col items-center py-2" href="#/caja_registrar" data-page="app_extraccion.html"><span class="material-icons">compare_arrows</span><span>Transf.</span></a>
-            <a class="flex flex-col items-center py-2" href="#/creador_pedido" data-page="creador_pedido.apps.js"><span class="material-icons">playlist_add</span><span>Pedidos</span></a>
-            <a class="flex flex-col items-center py-2" href="#/cotizaciones_historial" data-page="cotizaciones_historial.apps.js"><span class="material-icons">request_quote</span><span>Cotiz.</span></a>
-            <a class="flex flex-col items-center py-2" href="#/caja_chica_historial" data-page="caja_chica_historial.app.js"><span class="material-icons">account_balance_wallet</span><span>Cajas</span></a>
-            <a class="flex flex-col items-center py-2" href="#/caja_historial" data-page="app_historial_transferencias.html"><span class="material-icons">history</span><span>Historial</span></a>
+        <div id="nav-menu" class="nav-menu-mobile md:flex flex-grow justify-center space-x-4">
+          <!-- data-app para filtrar por permisos -->
+          <a href="#/compras_historial"      data-app="compras_historial"      data-page="compras_historial.apps.js" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Compras</a>
+          <a href="#/caja_registrar"         data-app="caja_registrar"         data-page="app_extraccion.html"       class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Transferencias</a>
+          <a href="#/creador_pedido"         data-app="creador_pedido"         data-page="creador_pedido.apps.js"    class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Pedidos</a>
+          <a href="#/cotizaciones_historial" data-app="cotizaciones_historial" data-page="cotizaciones_historial.apps.js" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Cotizaciones</a>
+          <a href="#/caja_chica_historial"   data-app="caja_chica_historial"   data-page="caja_chica_historial.app.js" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Cajas</a>
+          <a href="#/caja_historial"         data-app="caja_historial"         data-page="app_historial_transferencias.html" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-200">Historial Transferencias</a>
         </div>
+
+        <div class="flex items-center space-x-2">
+          <button id="refresh-catalog-btn" class="min-h-11 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-md flex items-center" title="Actualizar Historial de Productos" aria-label="Actualizar Historial de Productos">
+            <span class="material-icons text-base">sync</span>
+            <span id="refresh-spinner" class="hidden spinner w-4 h-4 ml-2 border-2 rounded-full border-white border-t-transparent"></span>
+          </button>
+          <button id="logout-btn" class="min-h-11 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl shadow-md" title="Cerrar Sesión" aria-label="Cerrar Sesión">
+            <span class="material-icons text-base">logout</span>
+          </button>
+          <button id="menu-toggle-btn" class="md:hidden p-2 rounded-md text-slate-700 hover:bg-slate-200" aria-controls="nav-menu" aria-expanded="false" aria-label="Abrir menú de navegación">
+            <span class="material-icons">menu</span>
+          </button>
+        </div>
+      </div>
     </nav>
 
-<script type="module">
+    <main id="content-container" class="container mx-auto p-4 md:p-6 flex-grow"></main>
+  </div>
+
+  <!-- Bottom nav (móvil) -->
+  <nav class="bottom-nav md:hidden bg-white border-t border-slate-200">
+    <div class="grid grid-cols-6 text-xs text-slate-600">
+      <a class="flex flex-col items-center py-2" href="#/compras_historial"      data-app="compras_historial"      data-page="compras_historial.apps.js"><span class="material-icons">shopping_cart</span><span>Compras</span></a>
+      <a class="flex flex-col items-center py-2" href="#/caja_registrar"         data-app="caja_registrar"         data-page="app_extraccion.html"><span class="material-icons">compare_arrows</span><span>Transf.</span></a>
+      <a class="flex flex-col items-center py-2" href="#/creador_pedido"         data-app="creador_pedido"         data-page="creador_pedido.apps.js"><span class="material-icons">playlist_add</span><span>Pedidos</span></a>
+      <a class="flex flex-col items-center py-2" href="#/cotizaciones_historial" data-app="cotizaciones_historial" data-page="cotizaciones_historial.apps.js"><span class="material-icons">request_quote</span><span>Cotiz.</span></a>
+      <a class="flex flex-col items-center py-2" href="#/caja_chica_historial"   data-app="caja_chica_historial"   data-page="caja_chica_historial.app.js"><span class="material-icons">account_balance_wallet</span><span>Cajas</span></a>
+      <a class="flex flex-col items-center py-2" href="#/caja_historial"         data-app="caja_historial"         data-page="app_historial_transferencias.html"><span class="material-icons">history</span><span>Historial</span></a>
+    </div>
+  </nav>
+
+  <!-- Modal: login operativo (UsuarioID + PIN) -->
+  <div id="oper-login-modal" class="hidden fixed inset-0 bg-black/60 z-50 items-center justify-center p-4">
+    <div class="bg-white rounded-2xl w-full max-w-sm p-5">
+      <h3 class="text-lg font-bold text-slate-900">Identifícate</h3>
+      <p class="text-slate-600 text-sm mt-1">Ingresa tu <b>Usuario</b> (UsuarioID) y <b>PIN</b>.</p>
+      <form id="oper-login-form" class="mt-4 grid gap-3">
+        <div>
+          <label class="block text-xs text-slate-600">Usuario</label>
+          <input id="op-usuario" type="text" autocomplete="username"
+                 class="mt-1 w-full h-11 rounded-lg border border-slate-300 p-2"
+                 placeholder="U001">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-600">PIN</label>
+          <input id="op-pin" type="password" autocomplete="current-password" inputmode="numeric"
+                 class="mt-1 w-full h-11 rounded-lg border border-slate-300 p-2"
+                 placeholder="****">
+        </div>
+        <div class="flex items-center justify-between">
+          <label class="flex items-center gap-2 text-sm">
+            <input id="op-remember" type="checkbox" class="h-4 w-4">
+            <span>Recordar usuario</span>
+          </label>
+          <button type="submit" class="h-11 px-4 rounded-xl bg-emerald-600 text-white font-semibold">Entrar</button>
+        </div>
+        <p id="op-error" class="text-sm text-red-600 hidden"></p>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
     import { appState, hydrateDrafts, savePedidoDraft, saveCotizacionDraft } from './state.js';
-    import { auth, db as firestoreDb, storage as firebaseStorage } from './firebase-init.js';    
+    import { auth, db as firestoreDb, storage as firebaseStorage } from './firebase-init.js';
     import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { loadContent } from './app_loader.js';
     import { createRouter } from './framework/router-lite.js';
     import { registry } from './framework/registry.js';
     import { env } from './env.js';
-    
 
+    // Firestore helpers
+    import {
+      collection, doc, getDoc, getDocs, query, where
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // Registro del Service Worker para caché de la app (sin cambios funcionales)
+    // Service Worker
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
-            .then(registration => console.log('Service Worker registrado con éxito:', registration.scope))
-            .catch(error => console.error('Fallo en el registro del Service Worker:', error));
+      navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+        .then(reg => console.log('Service Worker OK:', reg.scope))
+        .catch(err => console.error('SW error:', err));
     }
 
     const appShell = document.getElementById('app-shell');
@@ -113,6 +142,14 @@
     const menuToggleBtn = document.getElementById('menu-toggle-btn');
     const navMenu = document.getElementById('nav-menu');
 
+    // Modal login operativo
+    const OPER_MODAL = document.getElementById('oper-login-modal');
+    const OPER_FORM  = document.getElementById('oper-login-form');
+    const OP_USER    = document.getElementById('op-usuario');
+    const OP_PIN     = document.getElementById('op-pin');
+    const OP_REM     = document.getElementById('op-remember');
+    const OP_ERR     = document.getElementById('op-error');
+
     const BIGQUERY_API_URL = 'https://script.google.com/macros/s/AKfycbx6mWhvloaWRprnYFlEQ5iAHh4yMlwsHYk4x-iKXiDZeBX2JglqcOv87pUpwym0q1g_/exec';
     const CACHE_KEY = 'catalogData';
     const DB_NAME = 'ProductDashboardDB';
@@ -120,274 +157,361 @@
     const STORE_NAME = 'catalog';
 
     const router = createRouter({
-  container: contentContainer,
-  registry,
-  deps: { appState, auth, db: firestoreDb, storage: firebaseStorage, env },  
-  fallbackLoadContent: async (routeOrFile) => {
-    const file = routeOrFile.endsWith('.html') ? routeOrFile : 'fallback.html';
-    await loadContent(file, contentContainer);
-  }
-});
-
+      container: contentContainer,
+      registry,
+      deps: { appState, auth, db: firestoreDb, storage: firebaseStorage, env },
+      fallbackLoadContent: async (routeOrFile) => {
+        const file = routeOrFile.endsWith('.html') ? routeOrFile : 'fallback.html';
+        await loadContent(file, contentContainer);
+      }
+    });
 
     window.productCatalog = [];
     window.allProveedores = [];
     window.isCatalogReady = false;
 
-    // --- IndexedDB Functions ---
+    // IndexedDB (catálogo)
     let db;
     function openDatabase() {
-        return new Promise((resolve, reject) => {
-            if (db) {
-                resolve(db);
-                return;
-            }
-            const request = indexedDB.open(DB_NAME, DB_VERSION);
-            request.onerror = (event) => reject("Error al abrir IndexedDB:", event.target.errorCode);
-            request.onsuccess = (event) => {
-                db = event.target.result;
-                resolve(db);
-            };
-            request.onupgradeneeded = (event) => {
-                const db = event.target.result;
-                const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-                store.createIndex('timestamp', 'timestamp');
-            };
-        });
-    }
-
-    async function saveCatalogToDB(data) {
-        await openDatabase();
-        const transaction = db.transaction([STORE_NAME], 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        store.put({ id: CACHE_KEY, data: data, timestamp: Date.now() });
-        return new Promise(resolve => transaction.oncomplete = resolve);
-    }
-
-    async function getCatalogFromDB() {
-        await openDatabase();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORE_NAME], 'readonly');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.get(CACHE_KEY);
-            request.onsuccess = (event) => resolve(event.target.result);
-            request.onerror = (event) => reject(event.target.errorCode);
-        });
-    }
-
-    // --- Data Processing Functions ---
-    function translateBigQueryData(rawCatalog) {
-        if (!Array.isArray(rawCatalog)) {
-            console.error("Los datos recibidos no son un arreglo:", rawCatalog);
-            return [];
-        }
-
-        return rawCatalog.map(p => {
-            if (!p || typeof p !== 'object' || !p.Clave) { return null; }
-            const cleanData = {
-                ...p, Descripcion: p.Descripcion === '(en blanco)' ? 'Producto sin descripción' : p.Descripcion,
-                D_Global: parseFloat(p.D_Global) || 0, InvSeg: parseFloat(p.InvSeg) || 0, Tr_meses: parseFloat(p.Tr_meses) || 0,
-                PrecioU_Ref: parseFloat(p.PrecioU_Ref) || 0, PrecioVta_Ref: parseFloat(p.PrecioVta_Ref) || 0,
-                BasePack: parseInt(p.BasePack, 10) || 0, ModeQty: parseInt(p.ModeQty, 10) || 0,
-            };
-            const stockTotal = (parseFloat(p.Alm_1) || 0) + (parseFloat(p.Alm_2) || 0) + (parseFloat(p.Alm_3) || 0) + (parseFloat(p.Alm_4) || 0);
-            let ventas24 = {};
-            if (p.ventas24Json && typeof p.ventas24Json === 'string' && p.ventas24Json.trim() !== '(en blanco)') {
-                try { ventas24 = JSON.parse(p.ventas24Json); } catch (e) { console.warn(`Error al parsear ventas24Json para ${p.Clave}:`, p.ventas24Json); }
-            }
-            let preciosCompraRecientes = [];
-            if (p.preciosCompraRecientes && typeof p.preciosCompraRecientes === 'string' && p.preciosCompraRecientes.trim() !== '(en blanco)' && p.preciosCompraRecientes.trim().startsWith('[')) {
-                try { preciosCompraRecientes = JSON.parse(p.preciosCompraRecientes); } catch (e) { console.warn(`Error al parsear preciosCompraRecientes para ${p.Clave}:`, p.preciosCompraRecientes); }
-            }
-            const productoTraducido = {
-                ...cleanData, id: p.Clave, clave: p.Clave, nombre: cleanData.Descripcion, stockTotal: stockTotal,
-                stats: { ventas24, preciosCompraRecientes }
-            };
-            productoTraducido.kpis = calculateDynamicKpis(productoTraducido, stockTotal);
-            return productoTraducido;
-        }).filter(Boolean);
-    }
-
-    function calculateDynamicKpis(product, stockActual) {
-        const { D_Global = 0, InvSeg = 0, Tr_meses = 0.5, PrecioU_Ref = 0, PrecioVta_Ref = 0, HabitualesStr = '', BasePack = 0, ModeQty = 0 } = product;
-        const epsilon = 1e-6;
-        const DemandaDia = D_Global / 30.5;
-        const ROP = D_Global * Tr_meses + InvSeg;
-        const PedirCrudo = Math.max(0, ROP - stockActual);
-        let PedirRedondeado = 0;
-        let RazonRedondeo = '';
-        let PackUsado = 0;
-        if (PedirCrudo > 0) {
-            const habituales = (HabitualesStr || '').split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n) && n > 0).sort((a, b) => a - b);
-            const candidatoHabitual = habituales.find(h => h >= PedirCrudo);
-            if (candidatoHabitual && Math.abs(candidatoHabitual - PedirCrudo) <= (0.05 * PedirCrudo)) {
-                PedirRedondeado = candidatoHabitual; RazonRedondeo = 'habitual'; PackUsado = candidatoHabitual;
-            } else {
-                const BasePackEfectivo = BasePack > 0 ? BasePack : (ModeQty > 0 ? ModeQty : 0);
-                if (BasePackEfectivo > 0) {
-                    PedirRedondeado = Math.ceil(PedirCrudo / BasePackEfectivo) * BasePackEfectivo; RazonRedondeo = 'multiple_basepack'; PackUsado = BasePackEfectivo;
-                } else {
-                    const multiplos = [3, 6, 10, 12, 24, 48, 50, 100];
-                    const factor = multiplos.find(m => m >= PedirCrudo * 0.15 && m < PedirCrudo * 2) || (PedirCrudo > 12 ? 12 : 6);
-                    PedirRedondeado = Math.ceil(PedirCrudo / factor) * factor; RazonRedondeo = 'multiple_generico'; PackUsado = factor;
-                }
-            }
-            if (PedirCrudo > 0 && PedirRedondeado === 0) PedirRedondeado = PackUsado > 0 ? PackUsado : 1;
-        }
-        const PrioridadScore = ((PrecioVta_Ref - PrecioU_Ref) * D_Global * Tr_meses - Math.max(stockActual, ROP) * PrecioU_Ref * 0.03 * Tr_meses - Math.max(stockActual - ROP, 0) * PrecioU_Ref * 0.20 * Tr_meses) / Math.max(PedirRedondeado * PrecioU_Ref, 1);
-        return {
-            cantidadSugerida: PedirRedondeado, puntoDeReorden: ROP, vmp: D_Global, diasInv: stockActual / Math.max(DemandaDia, epsilon),
-            RazonRedondeo, PackUsado, RiesgoRuptura: stockActual <= InvSeg, SubtotalPedido: PedirRedondeado * PrecioU_Ref,
-            CoberturaPostPedido_meses: (stockActual + PedirRedondeado) / Math.max(D_Global, epsilon),
-            PrioridadScore: (stockActual <= InvSeg && (PrecioVta_Ref * D_Global * Tr_meses) > 0) ? 1000 + (PrecioVta_Ref * D_Global * Tr_meses) : PrioridadScore
+      return new Promise((resolve, reject) => {
+        if (db) return resolve(db);
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onerror = e => reject("Error IndexedDB:" + e.target.errorCode);
+        request.onsuccess = e => { db = e.target.result; resolve(db); };
+        request.onupgradeneeded = (e) => {
+          const dbx = e.target.result;
+          const store = dbx.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          store.createIndex('timestamp', 'timestamp');
         };
+      });
+    }
+    async function saveCatalogToDB(data) {
+      await openDatabase();
+      const tx = db.transaction([STORE_NAME], 'readwrite');
+      tx.objectStore(STORE_NAME).put({ id: CACHE_KEY, data, timestamp: Date.now() });
+      return new Promise(res => tx.oncomplete = res);
+    }
+    async function getCatalogFromDB() {
+      await openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction([STORE_NAME], 'readonly');
+        const req = tx.objectStore(STORE_NAME).get(CACHE_KEY);
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror = e => reject(e.target.errorCode);
+      });
     }
 
-    function extractSuppliers(catalog) {
-        const supplierNames = new Set();
-        catalog.forEach(p => {
-            if (p && p.stats && p.stats.preciosCompraRecientes) {
-                p.stats.preciosCompraRecientes.forEach(compra => {
-                    if (compra.Proveedor) supplierNames.add(compra.Proveedor);
-                });
-            }
-        });
-        return Array.from(supplierNames).sort();
-    }
-
-    // --- Main Logic ---
-    async function loadOrRefreshCatalog(forceRefresh = false) {
-    loadingMessage.textContent = 'Verificando datos locales...';
-    loadingOverlay.classList.remove('hidden');
-    refreshSpinner.classList.remove('hidden');
-    refreshCatalogBtn.disabled = true;
-
-    const CACHE_EXPIRATION = 12 * 60 * 60 * 1000; // 12 horas
-    let cachedData = null;
-
-    if (!forceRefresh) {
-        try {
-            cachedData = await getCatalogFromDB();
-        } catch (e) {
-            console.error("Error al leer de IndexedDB:", e);
+    // Transformación catálogo
+    function translateBigQueryData(rawCatalog) {
+      if (!Array.isArray(rawCatalog)) { console.error("No es arreglo:", rawCatalog); return []; }
+      return rawCatalog.map(p => {
+        if (!p || typeof p !== 'object' || !p.Clave) return null;
+        const cleanData = {
+          ...p,
+          Descripcion: p.Descripcion === '(en blanco)' ? 'Producto sin descripción' : p.Descripcion,
+          D_Global: parseFloat(p.D_Global) || 0, InvSeg: parseFloat(p.InvSeg) || 0, Tr_meses: parseFloat(p.Tr_meses) || 0.5,
+          PrecioU_Ref: parseFloat(p.PrecioU_Ref) || 0, PrecioVta_Ref: parseFloat(p.PrecioVta_Ref) || 0,
+          BasePack: parseInt(p.BasePack, 10) || 0, ModeQty: parseInt(p.ModeQty, 10) || 0,
+        };
+        const stockTotal = (parseFloat(p.Alm_1)||0) + (parseFloat(p.Alm_2)||0) + (parseFloat(p.Alm_3)||0) + (parseFloat(p.Alm_4)||0);
+        let ventas24 = {};
+        if (p.ventas24Json && typeof p.ventas24Json === 'string' && p.ventas24Json.trim() !== '(en blanco)') {
+          try { ventas24 = JSON.parse(p.ventas24Json); } catch {}
         }
+        let preciosCompraRecientes = [];
+        if (p.preciosCompraRecientes && typeof p.preciosCompraRecientes === 'string' && p.preciosCompraRecientes.trim() !== '(en blanco)' && p.preciosCompraRecientes.trim().startsWith('[')) {
+          try { preciosCompraRecientes = JSON.parse(p.preciosCompraRecientes); } catch {}
+        }
+        const productoTraducido = {
+          ...cleanData, id: p.Clave, clave: p.Clave, nombre: cleanData.Descripcion, stockTotal,
+          stats: { ventas24, preciosCompraRecientes }
+        };
+        productoTraducido.kpis = calculateDynamicKpis(productoTraducido, stockTotal);
+        return productoTraducido;
+      }).filter(Boolean);
     }
-    
-    // ⬇️ --- CAMBIO 1: Usar appState al cargar desde caché ---
-    if (cachedData && Date.now() - cachedData.timestamp < CACHE_EXPIRATION) {
-        console.log("Cargando historial desde IndexedDB.");
+    function calculateDynamicKpis(product, stockActual) {
+      const { D_Global=0, InvSeg=0, Tr_meses=0.5, PrecioU_Ref=0, PrecioVta_Ref=0, HabitualesStr='', BasePack=0, ModeQty=0 } = product;
+      const epsilon = 1e-6, DemandaDia = D_Global / 30.5;
+      const ROP = D_Global * Tr_meses + InvSeg;
+      const PedirCrudo = Math.max(0, ROP - stockActual);
+      let PedirRedondeado = 0, RazonRedondeo = '', PackUsado = 0;
+      if (PedirCrudo > 0) {
+        const habituales = (HabitualesStr || '').split(',').map(n => parseInt(n.trim(),10)).filter(n => !isNaN(n)&&n>0).sort((a,b)=>a-b);
+        const cand = habituales.find(h => h >= PedirCrudo);
+        if (cand && Math.abs(cand - PedirCrudo) <= (0.05 * PedirCrudo)) { PedirRedondeado = cand; RazonRedondeo='habitual'; PackUsado=cand; }
+        else {
+          const BasePackEf = BasePack>0 ? BasePack : (ModeQty>0 ? ModeQty : 0);
+          if (BasePackEf>0) { PedirRedondeado = Math.ceil(PedirCrudo/BasePackEf)*BasePackEf; RazonRedondeo='multiple_basepack'; PackUsado=BasePackEf; }
+          else {
+            const multiplos=[3,6,10,12,24,48,50,100];
+            const factor = multiplos.find(m => m >= PedirCrudo*0.15 && m < PedirCrudo*2) || (PedirCrudo>12?12:6);
+            PedirRedondeado = Math.ceil(PedirCrudo / factor) * factor; RazonRedondeo='multiple_generico'; PackUsado=factor;
+          }
+        }
+        if (PedirCrudo>0 && PedirRedondeado===0) PedirRedondeado = PackUsado>0 ? PackUsado : 1;
+      }
+      const PrioridadScore = ((PrecioVta_Ref-PrecioU_Ref)*D_Global*Tr_meses - Math.max(stockActual, ROP)*PrecioU_Ref*0.03*Tr_meses - Math.max(stockActual-ROP,0)*PrecioU_Ref*0.20*Tr_meses) / Math.max(PedirRedondeado*PrecioU_Ref,1);
+      return {
+        cantidadSugerida: PedirRedondeado, puntoDeReorden: ROP, vmp: D_Global, diasInv: stockActual / Math.max(DemandaDia, epsilon),
+        RazonRedondeo, PackUsado, RiesgoRuptura: stockActual <= InvSeg, SubtotalPedido: PedirRedondeado * PrecioU_Ref,
+        CoberturaPostPedido_meses: (stockActual + PedirRedondeado) / Math.max(D_Global, epsilon),
+        PrioridadScore: (stockActual <= InvSeg && (PrecioVta_Ref * D_Global * Tr_meses) > 0) ? 1000 + (PrecioVta_Ref * D_Global * Tr_meses) : PrioridadScore
+      };
+    }
+    function extractSuppliers(catalog) {
+      const names = new Set();
+      catalog.forEach(p => { p?.stats?.preciosCompraRecientes?.forEach(c => { if (c.Proveedor) names.add(c.Proveedor); }); });
+      return Array.from(names).sort();
+    }
+
+    // Catálogo: carga/caché
+    async function loadOrRefreshCatalog(forceRefresh=false) {
+      loadingMessage.textContent = 'Verificando datos locales...';
+      loadingOverlay.classList.remove('hidden');
+      refreshSpinner.classList.remove('hidden');
+      refreshCatalogBtn.disabled = true;
+
+      const CACHE_EXPIRATION = 12 * 60 * 60 * 1000;
+      let cachedData = null;
+      if (!forceRefresh) {
+        try { cachedData = await getCatalogFromDB(); } catch (e) { console.error("IndexedDB read:", e); }
+      }
+
+      if (cachedData && Date.now() - cachedData.timestamp < CACHE_EXPIRATION) {
         appState.productCatalog = translateBigQueryData(cachedData.data);
         appState.allProveedores = extractSuppliers(appState.productCatalog);
         appState.isCatalogReady = true;
-        
         loadingOverlay.classList.add('hidden');
         refreshSpinner.classList.add('hidden');
         refreshCatalogBtn.disabled = false;
         return;
-    }
+      }
 
-    loadingMessage.textContent = 'Cargando historial desde el servidor...';
-    try {
+      loadingMessage.textContent = 'Cargando historial desde el servidor...';
+      try {
         const response = await fetch(BIGQUERY_API_URL, {
-            method: 'POST', mode: 'cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ requestType: 'getHistory' })  
+          method: 'POST', mode: 'cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ requestType: 'getHistory' })
         });
-        
         if (!response.ok) throw new Error(`Error de red: ${response.statusText}`);
         const result = await response.json();
-        
         if (result.success) {
-            await saveCatalogToDB(result.data);
-            
-            // ⬇️ --- CAMBIO 2: Usar appState al cargar desde la red ---
-            appState.productCatalog = translateBigQueryData(result.data);
-            appState.allProveedores = extractSuppliers(appState.productCatalog);
-            appState.isCatalogReady = true;
-
-            console.log("Historial cargado desde BigQuery y guardado en IndexedDB.");
+          await saveCatalogToDB(result.data);
+          appState.productCatalog = translateBigQueryData(result.data);
+          appState.allProveedores = extractSuppliers(appState.productCatalog);
+          appState.isCatalogReady = true;
         } else {
-            throw new Error(result.error || "Error desconocido al obtener el historial.");
+          throw new Error(result.error || "Error al obtener el historial.");
         }
-    } catch (error) {
-        console.error("Error crítico al cargar el historial de productos:", error);
+      } catch (error) {
+        console.error("Carga catálogo:", error);
         loadingMessage.textContent = `Error al cargar: ${error.message}`;
-        
-        if (cachedData) {
-            console.log("Falló la carga de la red. Cargando datos expirados desde IndexedDB como respaldo.");
-            
-            // ⬇️ --- CAMBIO 3: Usar appState al cargar el respaldo de caché ---
-            appState.productCatalog = translateBigQueryData(cachedData.data);
-            appState.allProveedores = extractSuppliers(appState.productCatalog);
-            appState.isCatalogReady = true;
-
-            loadingMessage.textContent = 'Carga de red fallida. Usando datos antiguos.';
-            setTimeout(() => loadingOverlay.classList.add('hidden'), 2000);
+        const cached = await getCatalogFromDB().catch(()=>null);
+        if (cached) {
+          appState.productCatalog = translateBigQueryData(cached.data);
+          appState.allProveedores = extractSuppliers(appState.productCatalog);
+          appState.isCatalogReady = true;
+          loadingMessage.textContent = 'Carga de red fallida. Usando datos antiguos.';
+          setTimeout(()=>loadingOverlay.classList.add('hidden'), 2000);
         }
-    } finally {
+      } finally {
         if (!loadingMessage.textContent.startsWith('Error') && !loadingMessage.textContent.includes('antiguos')) {
-            loadingOverlay.classList.add('hidden');
+          loadingOverlay.classList.add('hidden');
         }
         refreshSpinner.classList.add('hidden');
         refreshCatalogBtn.disabled = false;
+      }
     }
-}
 
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    hydrateDrafts();                 // ⬅️ aquí
-    appShell.classList.remove('hidden');
-    await loadOrRefreshCatalog();
-    handleNavigation();
-  } else {
-    window.location.href = `login.html?redirect=${window.location.pathname}${window.location.hash || '#compras'}`;
-  }
-}); 
+    // =================== Permisos por usuario ===================
+    const ROLE_DEFAULT_APPS = {
+      'Administrador': ['*'],
+      'Supervisor':    ['jefe_caja','caja_formulario','caja_chica_historial'],
+      'Todo en uno':   ['caja_formulario','caja_chica_historial','caja_historial','compras_historial','creador_pedido','cotizaciones_historial'],
+      'Bodeguero':     [],
+      'Vendedor':      []
+    };
 
+    let ACTIVE_USUARIO_DOC = null; // {id, ...data}
+    let ALLOWED_APPS_SET   = new Set();
+    let FIRST_ALLOWED_APP  = null;
+    let BOOTSTRAP_MODE     = false;
 
-async function handleNavigation() {
-  const hash = window.location.hash || '#compras';
-
-  // NUEVO: apps modulares → "#/algo"
-  if (hash.startsWith('#/')) {
-    const route = hash.slice(2); // 'plantilla', etc.
-    await router.mount(route);
-    // limpiar estado visual legacy
-    navLinks.forEach(l => l.classList.remove('active'));
-    if (navMenu.classList.contains('active')) navMenu.classList.remove('active');
-    return;
-  }
-
-  // Legacy intacto (tu código actual)
-  const link = document.querySelector(`.nav-link[href="${hash}"]`);
-  if (link) {
-    const pageUrl = link.getAttribute('data-page');
-    await loadContent(pageUrl, contentContainer);
-    navLinks.forEach(l => l.classList.remove('active'));
-    link.classList.add('active');
-    if (navMenu.classList.contains('active')) {
-      navMenu.classList.remove('active');
+    function allowedAppsFromUserDoc(uDoc){
+      const arr = Array.isArray(uDoc?.allowedApps) ? uDoc.allowedApps
+                : (ROLE_DEFAULT_APPS[uDoc?.Rol || 'Vendedor'] || []);
+      return new Set(arr);
     }
-  }
-}
+    function computeFirstAllowedApp(){
+      if (ALLOWED_APPS_SET.has('*')) {
+        const candidates = Array.from(document.querySelectorAll('#nav-menu a[data-app]')).map(a => a.getAttribute('data-app'));
+        return candidates.find(a => !!registry[a]) || Object.keys(registry)[0];
+      }
+      return [...ALLOWED_APPS_SET].find(a => !!registry[a]) || null;
+    }
+    function filterNavUI(){
+      document.querySelectorAll('a[data-app]').forEach(a => {
+        const app = a.getAttribute('data-app');
+        const allowed = ALLOWED_APPS_SET.has('*') || ALLOWED_APPS_SET.has(app);
+        a.style.display = allowed ? '' : 'none';
+      });
+    }
+    async function thereAreActiveUsuarios(){
+      const snap = await getDocs(query(collection(firestoreDb,'usuarios'), where('Activo','==',true)));
+      return snap.size > 0;
+    }
+    function openOperModal(){ OPER_MODAL.classList.remove('hidden'); OPER_MODAL.classList.add('flex'); }
+    function closeOperModal(){ OPER_MODAL.classList.add('hidden'); OPER_MODAL.classList.remove('flex'); }
 
+    async function promptUsuarioPin(){
+      // Prefill con el último usuario recordado
+      const last = localStorage.getItem('lastUsuarioId');
+      if (last) { OP_USER.value = last; OP_REM.checked = true; }
+
+      OP_ERR.classList.add('hidden'); OP_ERR.textContent = '';
+      openOperModal();
+
+      return new Promise((resolve) => {
+        const onSubmit = async (e) => {
+          e.preventDefault();
+          OP_ERR.classList.add('hidden');
+
+          const usuarioId = (OP_USER.value || '').trim();
+          const pin = (OP_PIN.value || '').trim();
+          if (!usuarioId || !pin) {
+            OP_ERR.textContent = 'Usuario y PIN son obligatorios.';
+            OP_ERR.classList.remove('hidden');
+            return;
+          }
+
+          const ref = doc(firestoreDb,'usuarios', usuarioId);
+          const snap = await getDoc(ref);
+          if (!snap.exists()) {
+            OP_ERR.textContent = 'Usuario no encontrado.';
+            OP_ERR.classList.remove('hidden');
+            return;
+          }
+
+          const u = snap.data();
+          if (u.Activo !== true) {
+            OP_ERR.textContent = 'Usuario inactivo.';
+            OP_ERR.classList.remove('hidden');
+            return;
+          }
+          if (String(u.PIN) !== pin) {
+            OP_ERR.textContent = 'PIN incorrecto.';
+            OP_ERR.classList.remove('hidden');
+            return;
+          }
+
+          if (OP_REM.checked) localStorage.setItem('lastUsuarioId', usuarioId);
+          localStorage.setItem('activeUsuarioId', usuarioId);
+
+          closeOperModal();
+          OPER_FORM.removeEventListener('submit', onSubmit);
+          resolve({ id: usuarioId, data: u });
+        };
+        OPER_FORM.addEventListener('submit', onSubmit);
+      });
+    }
+
+    async function resolveActiveUsuarioDoc(){
+      // Bootstrap: sin usuarios activos → sólo Usuarios (admin)
+      if (!(await thereAreActiveUsuarios())) {
+        BOOTSTRAP_MODE = true;
+        ACTIVE_USUARIO_DOC = null;
+        ALLOWED_APPS_SET = new Set(['usuarios_admin']);
+        FIRST_ALLOWED_APP = 'usuarios_admin';
+        return;
+      }
+
+      // Siempre pedir Usuario + PIN
+      const { id, data } = await promptUsuarioPin();
+      ACTIVE_USUARIO_DOC = { id, ...data };
+      appState.activeUsuario = ACTIVE_USUARIO_DOC;
+
+      ALLOWED_APPS_SET = allowedAppsFromUserDoc(ACTIVE_USUARIO_DOC);
+      FIRST_ALLOWED_APP = computeFirstAllowedApp();
+    }
+
+    function guardRoute(appName){
+      if (!appName) return true;
+      if (ALLOWED_APPS_SET.has('*')) return true;
+      return ALLOWED_APPS_SET.has(appName);
+    }
+
+    // =================== Navegación ===================
+    async function handleNavigation() {
+      const hash = window.location.hash || '#/compras_historial';
+
+      if (hash.startsWith('#/')) {
+        const route = hash.slice(2).split('?')[0]; // nombre de la app
+        if (!guardRoute(route)) {
+          const target = FIRST_ALLOWED_APP || 'compras_historial';
+          if (route !== target) {
+            location.hash = `#/${target}`;
+            return;
+          }
+        }
+        await router.mount(route);
+        navLinks.forEach(l => l.classList.remove('active'));
+        if (navMenu.classList.contains('active')) navMenu.classList.remove('active');
+        return;
+      }
+
+      // Legacy (si quedan páginas HTML sueltas)
+      const link = document.querySelector(`.nav-link[href="${hash}"]`);
+      if (link) {
+        const app = link.getAttribute('data-app');
+        if (app && !guardRoute(app)) {
+          const target = FIRST_ALLOWED_APP || 'compras_historial';
+          location.hash = `#/${target}`;
+          return;
+        }
+        const pageUrl = link.getAttribute('data-page');
+        await loadContent(pageUrl, contentContainer);
+        navLinks.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+        if (navMenu.classList.contains('active')) navMenu.classList.remove('active');
+      }
+    }
+
+    // Auth bootstrap
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = `login.html?redirect=${window.location.pathname}${window.location.hash || '#compras'}`;
+        return;
+      }
+
+      hydrateDrafts();
+      appShell.classList.remove('hidden');
+
+      try {
+        await resolveActiveUsuarioDoc(); // pide Usuario+PIN o entra en bootstrap
+        filterNavUI();
+      } catch (e) {
+        console.error('Login operativo:', e);
+        ALLOWED_APPS_SET = new Set();
+        filterNavUI();
+      }
+
+      await loadOrRefreshCatalog();
+
+      if (BOOTSTRAP_MODE) location.hash = '#/usuarios_admin';
+      handleNavigation();
+    });
+
+    // Eventos
     window.addEventListener('hashchange', handleNavigation);
     refreshCatalogBtn.addEventListener('click', () => loadOrRefreshCatalog(true));
     document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
     menuToggleBtn.addEventListener('click', () => navMenu.classList.toggle('active'));
 
-
-window.addEventListener('beforeunload', () => {
-  savePedidoDraft();
-  saveCotizacionDraft();
-});
-
-window.addEventListener('storage', (e) => {
-  if (e.key === 'pedidoDraft:v1' || e.key === 'cotizacionDraft:v1') {
-    hydrateDrafts();
-  }
-});
-
-
-</script>
+    window.addEventListener('beforeunload', () => { savePedidoDraft(); saveCotizacionDraft(); });
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'pedidoDraft:v1' || e.key === 'cotizacionDraft:v1') hydrateDrafts();
+    });
+  </script>
 </body>
 </html>
