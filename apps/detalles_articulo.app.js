@@ -129,7 +129,7 @@ export default {
 
       container.innerHTML = `
         <div class="p-4 md:p-6 bg-white">
-          <button onclick="history.back()" class="flex items-center text-blue-600 hover:text-blue-800 font-semibold mb-4">
+          <button id="btn-volver" class="flex items-center text-blue-600 hover:text-blue-800 font-semibold mb-4">
             <i class="fas fa-arrow-left mr-2"></i> Volver a la lista
           </button>
           <h2 class="text-2xl font-bold text-gray-800">${product.nombre}</h2>
@@ -170,6 +170,22 @@ export default {
       `;
 
       renderCharts(stats.ventas24, stats.preciosCompraRecientes);
+
+      // Manejo "Volver": si venís con ?from=..., regresá ahí; si no, a #/pedidos
+      const btnVolver = container.querySelector('#btn-volver');
+      if (btnVolver) {
+        btnVolver.addEventListener('click', (e) => {
+          e.preventDefault();
+          const hashSearch = (location.hash.split('?')[1] || '');
+          const qp = new URLSearchParams(hashSearch);
+          const from = qp.get('from');
+          if (from) {
+            location.hash = decodeURIComponent(from);
+          } else {
+            location.hash = '#/pedidos';
+          }
+        });
+      }
     };
 
     // Render inicial

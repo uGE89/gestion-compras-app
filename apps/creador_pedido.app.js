@@ -479,7 +479,8 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
 
       function abrirDetalles(productId) {
         // 100% compatible con el router
-        location.hash = `#/detalles?id=${encodeURIComponent(productId)}`;
+        const from = encodeURIComponent(location.hash || '#/pedidos');
+        location.hash = `#/detalles?id=${encodeURIComponent(productId)}&from=${from}`;
       }
 
       // Ir a la vista "Mis pedidos"
