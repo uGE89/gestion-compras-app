@@ -126,6 +126,12 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase();
 
+    const normalizeId = (value) => {
+      const str = String(value ?? '');
+      const trimmed = str.replace(/^0+/, '');
+      return trimmed || str;
+    };
+
     // ===== Estado UI y del Pedido Actual =====
     let currentOrder = new Map(); // id -> { product, quantity }
     let lastFilteredProducts = [];
@@ -145,9 +151,10 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
       try {
         const draft = JSON.parse(savedDraft);
         for (const id in draft) {
-          const product = productCatalog.find((p) => p.id === id);
+          const normalizedId = normalizeId(id);
+          const product = productCatalog.find((p) => normalizeId(p.id) === normalizedId);
           if (product) {
-            currentOrder.set(id, { product, quantity: draft[id] });
+            currentOrder.set(normalizedId, { product, quantity: draft[id] });
           }
         }
       } catch (e) {
@@ -243,13 +250,14 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
     }
 
     const updateOrder = (productId, quantity) => {
+      const normalizedId = normalizeId(productId);
       if (quantity > 0) {
-        const product = productCatalog.find((p) => p.id === productId);
+        const product = productCatalog.find((p) => normalizeId(p.id) === normalizedId);
         if (product) {
-          currentOrder.set(productId, { product, quantity });
+          currentOrder.set(normalizedId, { product, quantity });
         }
       } else {
-        currentOrder.delete(productId);
+        currentOrder.delete(normalizedId);
       }
       updateOrderCount();
       saveDraftOrder();
@@ -311,7 +319,7 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
     };
 
     const createProductRowHTML = (p) => {
-      const orderedItem = currentOrder.get(p.id);
+      const orderedItem = currentOrder.get(normalizeId(p.id));
       const isOrdered = !!orderedItem;
       const cantidadSugerida = p.kpis?.cantidadSugerida || 0;
 
@@ -453,7 +461,7 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
         lastFilteredProducts.forEach((p) => {
           const sugerida = p.kpis?.cantidadSugerida || 0;
           if (sugerida > 0) {
-            const currentQty = Number(currentOrder.get(p.id)?.quantity) || 0;
+            const currentQty = Number(currentOrder.get(normalizeId(p.id))?.quantity) || 0;
             if (!(currentQty > 0)) {
               updateOrder(p.id, sugerida);
             }
