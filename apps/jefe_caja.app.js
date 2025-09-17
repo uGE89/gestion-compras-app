@@ -1,6 +1,6 @@
 // /public/apps/jefe_caja.app.js
-import { auth, db } from '../../firebase-init.js';
-import { appState as globalAppState } from '../../state.js'; // ⬅️ fallback si el router no inyecta appState
+import { auth, db } from '../firebase-init.js';
+import { appState as globalAppState } from '../state.js'; // ⬅️ fallback si el router no inyecta appState
 import {
   collection,
   query,
@@ -12,7 +12,7 @@ import {
   serverTimestamp,
   writeBatch
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { showToast } from '../../apps/lib/toast.js';
+import { showToast } from '../apps/lib/toast.js';
 
 // ⛔️ Eliminado TARGET_ACCOUNTS fijo
 
