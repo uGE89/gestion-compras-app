@@ -323,78 +323,90 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
       const isOrdered = !!orderedItem;
       const cantidadSugerida = p.kpis?.cantidadSugerida || 0;
 
+      const ultimoProv = getUltimoProveedor(p);
       const { compra, venta } = getPreciosRef(p);
       const stocks = getStocksByBranch(p);
       const total = Number(p.stockTotal ?? stocks.reduce((acc, s) => acc + (Number(s.qty) || 0), 0));
 
+      const provPill = ultimoProv
+        ? `<span class="px-3 py-1 rounded-full text-xs font-semibold text-white" style="background:#2563EB">${ultimoProv}</span>`
+        : `<span class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">Sin proveedor</span>`;
+
+      const riesgoPill = p.kpis?.RiesgoRuptura
+        ? `<span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">En riesgo</span>`
+        : `<span class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Ok</span>`;
+
       const sugeridoBtn = cantidadSugerida > 0
-        ? `
-        <button type="button"
-          class="sugerido-toggle-btn px-2 py-1 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-sm"
-          title="Usar sugerido: ${cantidadSugerida}"
-          data-product-id="${p.id}" data-quantity="${cantidadSugerida}">
-          Sugerido
-        </button>`
+        ? `<button type="button"
+              class="sugerido-toggle-btn w-full mt-2 px-3 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm"
+              title="Usar sugerido: ${cantidadSugerida}"
+              data-product-id="${p.id}" data-quantity="${cantidadSugerida}">
+              Sugerido (${cantidadSugerida})
+           </button>`
         : '';
 
       const quickClearBtn = isOrdered
-        ? `
-        <button type="button"
-          class="quick-clear-btn text-red-500 hover:text-red-700 p-1 rounded-md"
-          title="Borrar del pedido" data-product-id="${p.id}">
-          <i class="fas fa-trash-can"></i>
-        </button>`
+        ? `<button type="button"
+              class="quick-clear-btn absolute -right-2 -top-2 h-8 w-8 flex items-center justify-center rounded-full bg-white border text-red-500 hover:text-red-700 shadow"
+              title="Borrar del pedido" data-product-id="${p.id}">
+              <i class="fas fa-trash-can text-sm"></i>
+           </button>`
         : '';
 
       const stockChips = stocks.length
-        ? stocks
-            .map(
-              (s) => `
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
-            ${s.name}: <span class="ml-1 font-semibold">${Number(s.qty) || 0}</span>
-          </span>`
-            )
-            .join(' ')
+        ? stocks.map(s => `
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+              ${s.name}: <span class="ml-1 font-semibold">${Number(s.qty) || 0}</span>
+            </span>`).join(' ')
         : `<span class="text-[11px] text-slate-400">Sin desglose</span>`;
 
+      const footer = isOrdered
+        ? `<div class="mt-3 bg-emerald-50 text-emerald-700 text-center font-semibold rounded-2xl px-4 py-3">
+             En pedido: ${orderedItem.quantity}
+           </div>`
+        : '';
+
       return `
-        <tr class="border-b transition-colors ${isOrdered ? 'bg-blue-50' : 'hover:bg-gray-50'}" data-product-id="${p.id}">
-          <td class="p-3 align-top">
-            <div class="flex items-start justify-between gap-2">
-              <div>
-                <div class="font-semibold text-gray-800 flex items-center gap-2">
-                  ${p.nombre}
-                  ${p.kpis?.RiesgoRuptura ? '<i class="fas fa-exclamation-triangle text-yellow-500" title="Stock en riesgo"></i>' : ''}
+        <tr data-product-id="${p.id}">
+          <td colspan="2" class="p-2">
+            <article class="relative bg-white border rounded-3xl shadow-md hover:shadow-lg transition overflow-hidden">
+              ${quickClearBtn}
+              <div class="p-4">
+                <div class="flex items-start justify-between gap-4">
+                  <div class="flex flex-wrap items-center gap-2">
+                    ${provPill}
+                    ${riesgoPill}
+                  </div>
+                  <div class="w-32 shrink-0">
+                    <input
+                      type="number"
+                      class="quantity-input w-full h-11 text-center border rounded-2xl px-2 placeholder:text-gray-400"
+                      value="${isOrdered ? orderedItem.quantity : ''}"
+                      placeholder="${cantidadSugerida > 0 ? cantidadSugerida : '0'}"
+                      min="0" data-id="${p.id}">
+                    ${sugeridoBtn}
+                  </div>
                 </div>
-                <div class="mt-0.5 text-xs text-gray-500">
-                  Clave: <span class="font-medium text-gray-700">${p.clave}</span>
-                  <span class="mx-2 text-slate-300">•</span>
-                  Total: <span class="font-semibold">${Number.isFinite(total) ? total : '—'}</span>
-                </div>
-                <div class="mt-1 text-xs">
-                  <span class="text-slate-500">Costo:</span> <span class="font-semibold text-slate-700">${formatMoney(compra)}</span>
-                  <span class="mx-2 text-slate-300">•</span>
-                  <span class="text-slate-500">Venta:</span> <span class="font-semibold text-slate-700">${formatMoney(venta)}</span>
-                </div>
-                <div class="mt-2 flex flex-wrap gap-1">
-                  ${stockChips}
+
+                <div class="mt-3">
+                  <h3 class="text-lg md:text-xl font-bold text-slate-900">${p.nombre}</h3>
+                  <div class="mt-0.5 text-sm text-slate-500">
+                    Clave: <span class="font-medium text-slate-700">${p.clave}</span>
+                    <span class="mx-2 text-slate-300">•</span>
+                    Total: <span class="font-semibold">${Number.isFinite(total) ? total : '—'}</span>
+                  </div>
+                  <div class="mt-1 text-sm">
+                    <span class="text-slate-500">Costo:</span> <span class="font-semibold text-slate-700">${formatMoney(compra)}</span>
+                    <span class="mx-2 text-slate-300">•</span>
+                    <span class="text-slate-500">Venta:</span> <span class="font-semibold text-slate-700">${formatMoney(venta)}</span>
+                  </div>
+                  <div class="mt-2 flex flex-wrap gap-1">
+                    ${stockChips}
+                  </div>
+                  ${footer}
                 </div>
               </div>
-            </div>
-          </td>
-          <td class="p-3 align-top">
-            <div class="flex flex-col items-end justify-between h-full">
-              <div class="flex items-center gap-1">
-                ${quickClearBtn}
-                <input type="number" class="w-24 text-center border rounded-md p-1 quantity-input placeholder:text-gray-400"
-                  value="${isOrdered ? orderedItem.quantity : ''}"
-                  placeholder="${cantidadSugerida > 0 ? cantidadSugerida : '0'}"
-                  min="0" data-id="${p.id}">
-              </div>
-              <div class="mt-2">
-                ${sugeridoBtn}
-              </div>
-            </div>
+            </article>
           </td>
         </tr>`;
     };
