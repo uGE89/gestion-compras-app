@@ -29,7 +29,13 @@ export default {
       if (!appState.isCatalogReady) return;
     }
 
-    const product = appState.productCatalog.find(p => String(p.id) === String(productId));
+    const normalizeId = (value) => {
+      const str = String(value ?? '');
+      const trimmed = str.replace(/^0+/, '');
+      return trimmed || str;
+    };
+
+    const product = appState.productCatalog.find(p => normalizeId(p.id) === normalizeId(productId));
     if (!product) {
       container.innerHTML = `<div class="p-10 text-center text-red-500">Producto no encontrado.</div>`;
       return;

@@ -27,6 +27,12 @@ export function ItemsEditor({
 
   const norm = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 
+  const normalizeId = (value) => {
+    const str = String(value ?? '');
+    const trimmed = str.replace(/^0+/, '');
+    return trimmed || str;
+  };
+
   const escapeHtml = (s='') =>
     s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 
@@ -183,7 +189,7 @@ export function ItemsEditor({
     const cmp = card.querySelector('.price-comparison-content');
     if (cmp) {
       if (isAssoc) {
-        const cat = productCatalog.find(p => p.id === it.clave_catalogo);
+        const cat = productCatalog.find(p => normalizeId(p.id) === normalizeId(it.clave_catalogo));
         if (cat) {
           const ref = Number(cat.PrecioU_Ref||0);
           const pct = ref>0 ? ((pUnit - ref) / ref) * 100 : 0;
@@ -228,7 +234,7 @@ export function ItemsEditor({
     const isAssoc = !!it.clave_catalogo;
     let compareHTML = '<div class="text-center text-slate-400 text-sm p-2">Asocia un artículo para comparar.</div>';
     if (isAssoc) {
-      const cat = productCatalog.find(p => p.id === it.clave_catalogo);
+      const cat = productCatalog.find(p => normalizeId(p.id) === normalizeId(it.clave_catalogo));
       if (cat) {
         const ref = Number(cat.PrecioU_Ref||0);
         const pct = ref>0 ? ((pUnit - ref) / ref) * 100 : 0;
@@ -429,7 +435,7 @@ export function ItemsEditor({
     }
 
     function choose(id) {
-      const art = productCatalog.find(p => p.id === id);
+      const art = productCatalog.find(p => normalizeId(p.id) === normalizeId(id));
       if (!art) return;
       items[idx].clave_catalogo = art.id;
       items[idx].desc_catalogo  = art.nombre;
