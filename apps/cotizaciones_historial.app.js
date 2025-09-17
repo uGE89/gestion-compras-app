@@ -1,6 +1,11 @@
 // apps/cotizaciones_historial.app.js
 import {
-  collection, onSnapshot, query, orderBy
+  collection,
+  onSnapshot,
+  query,
+  orderBy,
+  doc,
+  getDoc
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 const COT_COLLECTION = 'cotizaciones_analizadas';
 
@@ -163,11 +168,12 @@ export default {
             <div class="space-x-2">
               <button data-id="${c.id}" class="btn-edit bg-amber-500 hover:bg-amber-600 text-white font-medium py-2 px-3 rounded-lg">Editar</button>
               <button data-id="${c.id}" class="btn-view bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-2 px-4 rounded-lg">Ver Detalles</button>
+              <button data-id="${c.id}" class="btn-print bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3 rounded-lg">Imprimir</button>
             </div>
-          </div>
-        `;
-      }).join('');
-    }
+        </div>
+      `;
+    }).join('');
+  }
 
     // --- Eventos de filtros ---
     fSearch.addEventListener('input', applyFilters);
@@ -180,14 +186,128 @@ export default {
     root.addEventListener('click', (e) => {
       const v = e.target.closest('.btn-view');
       const ed = e.target.closest('.btn-edit');
+      const pr = e.target.closest('.btn-print');
       if (v) {
         const id = v.getAttribute('data-id');
         location.hash = `#/cotizaciones_detalles?id=${encodeURIComponent(id)}`;
       } else if (ed) {
         const id = ed.getAttribute('data-id');
         location.hash = `#/cotizaciones_editar?id=${encodeURIComponent(id)}`;
+      } else if (pr) {
+        const id = pr.getAttribute('data-id');
+        if (id) {
+          printQuote(id);
+        }
       }
     });
+
+    async function printQuote(quoteId) {
+      try {
+        const snap = await getDoc(doc(db, COT_COLLECTION, quoteId));
+        if (!snap.exists()) {
+          alert('No se encontró la cotización.');
+          return;
+        }
+
+        const data = snap.data();
+        const folio = data.numero_cotizacion || data.folio || data.numero || quoteId.slice(0, 6);
+        const items = Array.isArray(data.items)
+          ? data.items.slice().sort((a, b) => {
+              const an = (a.descripcion_factura || a.descripcion || '').toLowerCase();
+              const bn = (b.descripcion_factura || b.descripcion || '').toLowerCase();
+              return an.localeCompare(bn);
+            })
+          : [];
+
+        const rows = items.length
+          ? items
+              .map((it) => {
+                const desc = it.descripcion_factura || it.descripcion || it.desc_catalogo || it.clave_catalogo || '—';
+                const qty = Number(it.cantidad_factura ?? it.cantidad ?? 0) || 0;
+                const qtyDisplay = qty.toLocaleString('es-NI', { maximumFractionDigits: 2 });
+                const unit = Number(
+                  it.precio_final ??
+                    (qty ? (Number(it.total_linea_final ?? it.total_linea ?? 0) / qty) : 0)
+                );
+                const subtotal = Number(it.total_linea_final ?? it.total_linea ?? unit * qty);
+                return `
+                  <tr class="border-b">
+                    <td class="p-2">${desc}</td>
+                    <td class="p-2 text-center">${qtyDisplay}</td>
+                    <td class="p-2 text-right">${fCur(unit)}</td>
+                    <td class="p-2 text-right font-semibold">${fCur(subtotal)}</td>
+                  </tr>
+                `;
+              })
+              .join('')
+          : '<tr><td colspan="4" class="p-4 text-center text-slate-500">Sin ítems.</td></tr>';
+
+        const totalItems = items.reduce((sum, it) => sum + (Number(it.cantidad_factura ?? it.cantidad ?? 0) || 0), 0);
+        const totalAmount = Number(data.total ?? 0) ||
+          items.reduce((sum, it) => sum + (Number(it.total_linea_final ?? it.total_linea ?? 0) || 0), 0);
+        const totalItemsDisplay = totalItems.toLocaleString('es-NI', { maximumFractionDigits: 2 });
+
+        const html = `
+          <!DOCTYPE html>
+          <html lang="es">
+            <head>
+              <title>Cotización ${folio}</title>
+              <script src="https://cdn.tailwindcss.com"><\/script>
+              <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+              <style>
+                body { font-family: 'Inter', sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                @page { size: auto; margin: 20mm; }
+              </style>
+            </head>
+            <body class="p-4">
+              <div class="mb-6">
+                <h1 class="text-3xl font-bold">Cotización #${folio}</h1>
+                <p class="text-gray-600">Proveedor: ${data.proveedor || 'N/A'}</p>
+                <p class="text-gray-600">Fecha: ${data.fecha ? fDate(data.fecha) : 'N/A'}</p>
+              </div>
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b">
+                    <th class="text-left p-2 font-semibold">Descripción</th>
+                    <th class="text-center p-2 font-semibold">Cantidad</th>
+                    <th class="text-right p-2 font-semibold">Precio Final</th>
+                    <th class="text-right p-2 font-semibold">Total</th>
+                  </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+              <div class="mt-8 text-right">
+                <p class="text-gray-600">Total de Ítems: <span class="font-bold">${totalItemsDisplay}</span></p>
+                <p class="text-2xl font-bold">Total: ${fCur(totalAmount)}</p>
+              </div>
+              <script>
+                window.addEventListener('load', () => {
+                  setTimeout(() => {
+                    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+                    if (!isTouch) {
+                      window.addEventListener('afterprint', () => window.close());
+                    }
+                    window.print();
+                  }, 300);
+                });
+              <\/script>
+            </body>
+          </html>
+        `;
+
+        const w = window.open('', '_blank');
+        if (!w) {
+          alert('No se pudo abrir la ventana de impresión.');
+          return;
+        }
+        w.document.write(html);
+        w.document.close();
+        w.focus();
+      } catch (err) {
+        console.error('[cotizaciones_historial] Error al imprimir cotización:', err);
+        alert('Ocurrió un error al preparar la impresión.');
+      }
+    }
 
     // Cleanup
     this._cleanup = () => { try { unsubscribe?.(); } catch {} };
