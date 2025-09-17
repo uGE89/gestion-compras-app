@@ -1,5 +1,4 @@
 export const registry = {
-  'analizador-compra': () => import('../apps/analizador_compra.app.js'),
   'creador_pedido': () => import('../apps/creador_pedido.app.js'),
   'detalles': () => import('../apps/detalles_articulo.app.js'),
   'mis_pedidos': () => import('../apps/mis_pedidos.app.js'),
