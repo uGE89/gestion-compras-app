@@ -50,13 +50,7 @@ export default {
             <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Detalles de la Cotización</h1>
             <p class="text-slate-500">#${folio} · ${data.proveedor || '—'}</p>
           </div>
-          <div class="flex flex-wrap gap-2 justify-end">
-            <button id="back" class="text-slate-600 hover:text-slate-900">Volver</button>
-            <button id="edit-btn" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg">Editar</button>
-            <button id="to-order" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg">
-              Enviar a Pedido
-            </button>
-          </div>
+          <div id="quote-actions" class="flex flex-wrap gap-2 justify-end"></div>
         </header>
 
         <section class="bg-white p-4 md:p-6 rounded-2xl shadow-xl space-y-6">
@@ -171,18 +165,54 @@ export default {
         </section>
       `;
 
+      const actionsWrap = root.querySelector('#quote-actions');
+      let backBtn = root.querySelector('#back');
+      let editBtn = root.querySelector('#edit-btn');
+      let orderBtn = root.querySelector('#to-order');
+
+      if (actionsWrap) {
+        backBtn = document.createElement('button');
+        backBtn.id = 'back';
+        backBtn.type = 'button';
+        backBtn.className = 'text-slate-600 hover:text-slate-900 transition-colors';
+        backBtn.textContent = 'Volver';
+
+        editBtn = document.createElement('button');
+        editBtn.id = 'edit-btn';
+        editBtn.type = 'button';
+        editBtn.className = 'bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg';
+        editBtn.textContent = 'Editar';
+
+        orderBtn = document.createElement('button');
+        orderBtn.id = 'to-order';
+        orderBtn.type = 'button';
+        orderBtn.className = 'bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center gap-2';
+        orderBtn.innerHTML = '<span class="material-icons text-base">send</span><span>Enviar a Pedido</span>';
+        orderBtn.setAttribute('aria-label', 'Enviar cotización a pedido');
+        orderBtn.title = 'Enviar cotización al creador de pedidos';
+
+        actionsWrap.replaceChildren(backBtn, editBtn, orderBtn);
+      }
+
+      const hasItemsForOrder = (items || []).some(it => (Number(it.cantidad_factura ?? it.cantidad ?? 0) || 0) > 0);
+      if (orderBtn) {
+        orderBtn.disabled = !hasItemsForOrder;
+        orderBtn.classList.toggle('opacity-60', !hasItemsForOrder);
+        orderBtn.classList.toggle('cursor-not-allowed', !hasItemsForOrder);
+      }
+
       // Volver al historial de cotizaciones
-      root.querySelector('#back').addEventListener('click', ()=>{
+      backBtn?.addEventListener('click', ()=>{
         location.hash = '#/cotizaciones_historial';
       });
 
       // Navegar a editar
-      root.querySelector('#edit-btn').addEventListener('click', ()=>{
+      editBtn?.addEventListener('click', ()=>{
         location.hash = `#/cotizaciones_editar?id=${encodeURIComponent(id)}`;
       });
 
       // Enviar a creador de pedidos
-      root.querySelector('#to-order').addEventListener('click', ()=>{
+      orderBtn?.addEventListener('click', ()=>{
         if (!appState) {
           console.error('appState no disponible, no se puede preparar el pedido.');
           showToast('No se pudo preparar el pedido', 'error');
