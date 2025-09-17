@@ -170,7 +170,7 @@ export default {
       });
 
       appState.pedidoDraft = { rfqId, items: cart };
-      location.hash = '#/creador-pedido'; // tu app ya imprime/arma el pedido
+      location.hash = '#/creador_pedido'; // tu app ya imprime/arma el pedido
     });
   },
   unmount(){ }
