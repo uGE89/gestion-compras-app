@@ -12,6 +12,9 @@ export default {
     const safeParams = (params instanceof URLSearchParams)
       ? params
       : new URLSearchParams(hashSearch);
+
+    const fromInUrl = safeParams.get('from');
+    if (fromInUrl) sessionStorage.setItem('last_from_pedidos', fromInUrl);
     const productId =
       safeParams.get('id') ||
       safeParams.get('productoId') ||
