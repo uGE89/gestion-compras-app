@@ -11,10 +11,10 @@ export function createRouter({ container, registry, deps = {}, fallbackLoadConte
   function parseRoute(route) {
     const hash = typeof route === 'string' && route ? route : (location.hash || '#/compras_historial');
     const raw = hash.replace(/^#\/?/, '');          // "#/x?y" -> "x?y"
-    const [pathRaw, qs] = raw.split('?');
-    const path = (pathRaw || '').replace(/\/+$/, ''); // quita "/" al final
+    const [pathRaw = '', qs] = raw.split('?');
+    const cleanPath = pathRaw.replace(/\/+$/, ''); // quita "/" al final
     const params = new URLSearchParams(qs || '');
-    return { path, params };
+    return { path: pathRaw, cleanPath, params };
   }
 
   function getLoader(key) {
@@ -34,12 +34,12 @@ export function createRouter({ container, registry, deps = {}, fallbackLoadConte
   }
 
   async function mount(route) {
-    const { path, params } = parseRoute(route);
+    const { cleanPath, params } = parseRoute(route);
 
     await unmount();
     container.innerHTML = '<div class="text-center py-10 text-slate-500">Cargando…</div>';
 
-    const loader = getLoader(path);
+    const loader = getLoader(cleanPath);
     if (loader) {
       try {
         const mod = await loader();
