@@ -429,7 +429,7 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
         prov: selectedSupplierName,
         solo: reorderFilterActive ? '1' : '',
       });
-      history.replaceState(null, '', `#/pedidos?${qs.toString()}`);
+      history.replaceState(null, '', `#/creador_pedido?${qs.toString()}`);
     };
 
     // ===== Manejadores de Eventos =====
@@ -499,7 +499,7 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
 
       function abrirDetalles(productId) {
         // 100% compatible con el router
-        const from = location.hash || '#/pedidos';
+        const from = location.hash || '#/creador_pedido';
         // Guardamos también en sessionStorage por si se pierde el query param
         sessionStorage.setItem('last_from_pedidos', from);
         location.hash = `#/detalles?id=${encodeURIComponent(productId)}&from=${encodeURIComponent(from)}`;
