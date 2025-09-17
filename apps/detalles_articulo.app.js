@@ -7,7 +7,15 @@ export default {
       window.Chart.register(window.ChartDataLabels);
     }
 
-    const productId = params.get('id');
+    // Fallback robusto para obtener el id desde el hash si params no llegó
+    const hashSearch = (location.hash.split('?')[1] || '');
+    const safeParams = (params instanceof URLSearchParams)
+      ? params
+      : new URLSearchParams(hashSearch);
+    const productId =
+      safeParams.get('id') ||
+      safeParams.get('productoId') ||
+      safeParams.get('pid');
     if (!productId) {
       container.innerHTML = `<div class="p-10 text-center text-gray-500">Producto no especificado.</div>`;
       return;
@@ -21,7 +29,7 @@ export default {
       if (!appState.isCatalogReady) return;
     }
 
-    const product = appState.productCatalog.find(p => p.id === productId);
+    const product = appState.productCatalog.find(p => String(p.id) === String(productId));
     if (!product) {
       container.innerHTML = `<div class="p-10 text-center text-red-500">Producto no encontrado.</div>`;
       return;
