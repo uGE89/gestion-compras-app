@@ -78,7 +78,7 @@ Las apps reciben params en mount:
 const productId = params.get('id');
 
 Checklist de Contexto Mínimo (para abrir issues/consultas)
-Ruta/flujo: #/creador-pedido → #/detalles?id=160MC03
+Ruta/flujo: #/creador_pedido → #/detalles?id=160MC03
 
 Objetivo: qué esperas lograr
 
