@@ -157,7 +157,8 @@
                 bankAccountId: mirrorBankAccountId,
                 banco: mirrorAccount.name,
                 color: mirrorAccount.color,
-                status: 'pending_review', // El espejo se crea como APROBADO automáticamente.
+                alegraPaymentId: null,
+                status: 'pending_review', // El espejo se crea como pendiente de revisión.
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
                 isMirror: true, // Bandera para identificarlo como espejo
