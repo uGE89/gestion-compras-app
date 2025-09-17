@@ -499,8 +499,10 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
 
       function abrirDetalles(productId) {
         // 100% compatible con el router
-        const from = encodeURIComponent(location.hash || '#/pedidos');
-        location.hash = `#/detalles?id=${encodeURIComponent(productId)}&from=${from}`;
+        const from = location.hash || '#/pedidos';
+        // Guardamos también en sessionStorage por si se pierde el query param
+        sessionStorage.setItem('last_from_pedidos', from);
+        location.hash = `#/detalles?id=${encodeURIComponent(productId)}&from=${encodeURIComponent(from)}`;
       }
 
       // Ir a la vista "Mis pedidos"
