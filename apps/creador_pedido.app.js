@@ -17,6 +17,13 @@ export default {
 
     const productCatalog = appState.productCatalog;
     const allProveedores = appState.allProveedores;
+    const proveedoresList = Array.isArray(allProveedores) ? allProveedores : [];
+    const proveedorLookup = new Map(
+      proveedoresList
+        .filter((name) => typeof name === 'string')
+        .map((name) => [name.trim(), name])
+        .filter(([key]) => key)
+    );
 
     // ===== Helpers =====
 
@@ -78,6 +85,25 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
       if (!arr.length) return '';
       const sorted = [...arr].sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
       return sorted[0]?.Proveedor || '';
+    };
+
+    const getHistoricoProveedores = (p) => {
+      const recientes = Array.isArray(p?.stats?.preciosCompraRecientes)
+        ? p.stats.preciosCompraRecientes
+        : [];
+      const unique = [];
+      const seen = new Set();
+
+      for (const item of recientes) {
+        const raw = typeof item?.Proveedor === 'string' ? item.Proveedor.trim() : '';
+        if (!raw) continue;
+        const canonical = proveedorLookup.get(raw) || (proveedoresList.includes(raw) ? raw : null);
+        if (!canonical || seen.has(canonical)) continue;
+        seen.add(canonical);
+        unique.push(canonical);
+      }
+
+      return unique;
     };
 
     const formatMoney = (n) => {
@@ -298,7 +324,7 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
       }
 
       if (selectedSupplierName !== 'all') {
-        filtered = filtered.filter((p) => getUltimoProveedor(p) === selectedSupplierName);
+        filtered = filtered.filter((p) => getHistoricoProveedores(p).includes(selectedSupplierName));
       }
 
       if (searchTerm) {
