@@ -2,13 +2,14 @@
 import {
   doc, getDoc, updateDoc, arrayUnion, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { savePedidoDraft } from '../state.js';
 
 const COT_COLLECTION = 'cotizaciones_analizadas';
 
 
 export default {
   title: 'Detalles de Cotización',
-  async mount(container, { db, auth, params }) {
+  async mount(container, { db, auth, params, appState, navigate }) {
     const id = params.get('id');
     if (!id) { container.innerHTML = '<div class="p-6 text-slate-500">ID no especificado.</div>'; return; }
 
@@ -49,9 +50,12 @@ export default {
             <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Detalles de la Cotización</h1>
             <p class="text-slate-500">#${folio} · ${data.proveedor || '—'}</p>
           </div>
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2 justify-end">
             <button id="back" class="text-slate-600 hover:text-slate-900">Volver</button>
             <button id="edit-btn" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg">Editar</button>
+            <button id="to-order" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg">
+              Enviar a Pedido
+            </button>
           </div>
         </header>
 
@@ -175,6 +179,52 @@ export default {
       // Navegar a editar
       root.querySelector('#edit-btn').addEventListener('click', ()=>{
         location.hash = `#/cotizaciones_editar?id=${encodeURIComponent(id)}`;
+      });
+
+      // Enviar a creador de pedidos
+      root.querySelector('#to-order').addEventListener('click', ()=>{
+        if (!appState) {
+          console.error('appState no disponible, no se puede preparar el pedido.');
+          showToast('No se pudo preparar el pedido', 'error');
+          return;
+        }
+
+        const cart = (items || []).map((it, idx) => {
+          const qty = Number(it.cantidad_factura || it.cantidad || 0) || 0;
+          if (qty <= 0) return null;
+
+          const idItem = (it.clave_catalogo || it.desc_catalogo || it.descripcion_factura || it.descripcion || `ITEM-${idx}`)
+            .toString()
+            .trim();
+
+          return {
+            id: idItem,
+            nombre: it.desc_catalogo || it.descripcion_factura || it.descripcion || idItem,
+            cantidad: qty,
+            precioUnit: Number(it.precio_final || it.precio_unit || it.precio || 0) || 0,
+            proveedor: data.proveedor || ''
+          };
+        }).filter(Boolean);
+
+        if (!cart.length) {
+          showToast('La cotización no tiene artículos con cantidad válida', 'error');
+          return;
+        }
+
+        appState.pedidoDraft = {
+          source: 'cotizacion',
+          cotizacionId: id,
+          folio,
+          proveedor: data.proveedor || '',
+          items: cart
+        };
+
+        try { savePedidoDraft(); } catch (err) { console.warn('No se pudo guardar el borrador del pedido', err); }
+
+        showToast('Cotización enviada al creador de pedidos', 'success');
+
+        if (typeof navigate === 'function') navigate('creador_pedido');
+        else location.hash = '#/creador_pedido';
       });
 
       // Copia rápida
