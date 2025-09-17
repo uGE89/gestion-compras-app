@@ -177,19 +177,23 @@ export default {
 
       renderCharts(stats.ventas24, stats.preciosCompraRecientes);
 
-      // Manejo "Volver": si venís con ?from=..., regresá ahí; si no, a #/pedidos
+      // Manejo "Volver": intentar tomar ?from=..., luego sessionStorage, y fallback a #/pedidos
       const btnVolver = container.querySelector('#btn-volver');
       if (btnVolver) {
         btnVolver.addEventListener('click', (e) => {
           e.preventDefault();
+
           const hashSearch = (location.hash.split('?')[1] || '');
           const qp = new URLSearchParams(hashSearch);
-          const from = qp.get('from');
-          if (from) {
-            location.hash = decodeURIComponent(from);
-          } else {
-            location.hash = '#/pedidos';
-          }
+          let from = qp.get('from');
+
+          if (!from) from = sessionStorage.getItem('last_from_pedidos');
+          if (!from) from = '#/pedidos';
+
+          try { from = decodeURIComponent(from); } catch (_) {}
+          if (!from.startsWith('#')) from = '#/pedidos';
+
+          location.hash = from;
         });
       }
     };
