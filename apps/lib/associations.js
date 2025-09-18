@@ -23,14 +23,15 @@ const sanitizeFirestoreIdSegment = (segment='') => {
 };
 
 const normCode  = (s='') => sanitizeFirestoreIdSegment(String(s).trim().toLowerCase());
-const idProvCode = (prov, code) => `provcode:${normProv(prov)}:${normCode(code)}`;
+const idProvCode = (prov, safeCode) => `provcode:${normProv(prov)}:${safeCode}`;
 const idProvDesc = (prov, desc) => `provdesc:${normProv(prov)}:${slugifyDesc(desc)}`;
 const idDesc     = (desc)        => `desc:${slugifyDesc(desc)}`;
 
 /** Lee en cascada con memo: prov+code → prov+desc → desc */
 export async function findAssociationCascade(db, { proveedor, codigoProveedor, descripcion }) {
+  const safeCode = codigoProveedor ? normCode(codigoProveedor) : null;
   const keys = [
-    codigoProveedor ? idProvCode(proveedor, codigoProveedor) : null,
+    safeCode ? idProvCode(proveedor, safeCode) : null,
     (proveedor && descripcion) ? idProvDesc(proveedor, descripcion) : null,
     descripcion ? idDesc(descripcion) : null
   ].filter(Boolean);
@@ -56,8 +57,9 @@ export async function associateItemsBatch(db, proveedor, rawItems) {
   const rows = rawItems.map(it => {
     const desc = it.descripcion ?? it.descripcion_factura ?? '';
     const code = it.clave_proveedor ?? null;
+    const safeCode = code ? normCode(code) : null;
     const ids = [
-      code ? idProvCode(proveedor, code) : null,
+      safeCode ? idProvCode(proveedor, safeCode) : null,
       proveedor && desc ? idProvDesc(proveedor, desc) : null,
       desc ? idDesc(desc) : null
     ].filter(Boolean);
@@ -99,7 +101,8 @@ export async function persistMappingsForItem(db, proveedor, it) {
   const code = it.clave_proveedor || null;
 
   if (code) {
-    ops.push(setDoc(doc(db, MAP_COLLECTION, idProvCode(proveedor, code)), {
+    const safeCode = normCode(code);
+    ops.push(setDoc(doc(db, MAP_COLLECTION, idProvCode(proveedor, safeCode)), {
       descripcion_proveedor: desc,
       clave_proveedor: code,
       proveedor: proveedor,
