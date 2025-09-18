@@ -25,10 +25,18 @@ assert.notStrictEqual(normCode('ABC/123'), normCode('ABC-123'), 'encoded slash s
 assert.strictEqual(normCode('abc\u0000def'), 'abc-00-def', 'control characters should be encoded');
 assert.strictEqual(normCode('__name__'), '--name--', 'reserved document IDs should be adjusted');
 
+const safeAbc123 = normCode('ABC/123');
 assert.strictEqual(
-  idProvCode('Proveedor Ejemplo', 'ABC/123'),
+  idProvCode('Proveedor Ejemplo', safeAbc123),
   'provcode:proveedor-ejemplo:abc-2f-123',
   'idProvCode should use the sanitized code'
+);
+
+const safe946 = normCode('94638/712');
+assert.strictEqual(
+  idProvCode('Proveedor Ejemplo', safe946),
+  'provcode:proveedor-ejemplo:94638-2f-712',
+  'idProvCode should reuse sanitized IDs for slashed provider codes'
 );
 
 console.log('associations.normCode tests passed');
