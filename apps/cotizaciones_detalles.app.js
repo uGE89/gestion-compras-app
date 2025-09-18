@@ -1,6 +1,6 @@
 // apps/cotizaciones_detalles.app.js
 import {
-  doc, getDoc, updateDoc, arrayUnion, serverTimestamp
+  doc, getDoc, updateDoc, arrayUnion, Timestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { savePedidoDraft } from '../state.js';
 import { normalizeId, formatMoney } from './lib/helpers.js';
@@ -331,7 +331,7 @@ export default {
         const txt = root.querySelector('#comment-txt').value.trim();
         if (!txt) return;
         await updateDoc(doc(db, COT_COLLECTION,id), {
-          comments: arrayUnion({ text: txt, authorId: auth?.currentUser?.uid || 'anon', createdAt: serverTimestamp() })
+          comments: arrayUnion({ text: txt, authorId: auth?.currentUser?.uid || 'anon', createdAt: Timestamp.now() })
         });
         showToast('Comentario añadido');
         await load();
