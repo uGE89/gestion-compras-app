@@ -1,5 +1,7 @@
 // apps/detalles_articulo.app.js
 
+import { normalizeId } from './lib/helpers.js';
+
 export default {
   async mount(container, { appState, params }) {
     // Registrar el plugin DataLabels si está disponible por CDN
@@ -31,12 +33,6 @@ export default {
       }
       if (!appState.isCatalogReady) return;
     }
-
-    const normalizeId = (value) => {
-      const str = String(value ?? '');
-      const trimmed = str.replace(/^0+/, '');
-      return trimmed || str;
-    };
 
     const product = appState.productCatalog.find(p => normalizeId(p.id) === normalizeId(productId));
     if (!product) {

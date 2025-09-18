@@ -3,6 +3,7 @@ import {
   doc, getDoc, updateDoc, arrayUnion, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { savePedidoDraft } from '../state.js';
+import { normalizeId, formatMoney } from './lib/helpers.js';
 
 const COT_COLLECTION = 'cotizaciones_analizadas';
 
@@ -13,7 +14,6 @@ export default {
     const id = params.get('id');
     if (!id) { container.innerHTML = '<div class="p-6 text-slate-500">ID no especificado.</div>'; return; }
 
-    const fCur  = n => `$${(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
     const fDate = s => { const d=new Date(s); return isNaN(d)? (s||'') :
       `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; };
 
@@ -33,12 +33,6 @@ export default {
     container.innerHTML = ''; container.appendChild(root);
 
     const productCatalog = appState?.productCatalog || [];
-
-    const normalizeId = (value) => {
-      const str = String(value ?? '');
-      const trimmed = str.replace(/^0+/, '');
-      return trimmed || str;
-    };
 
     async function load() {
       const snap = await getDoc(doc(db, COT_COLLECTION, id));
@@ -167,10 +161,10 @@ export default {
                         </td>
                         <td class="p-2 text-right">${uxp}</td>
                         <td class="p-2 text-right">
-                          <span class="copy cursor-pointer" title="Copiar" data-copy="${pfinal.toFixed(2)}">${fCur(pfinal)}</span>
+                          <span class="copy cursor-pointer" title="Copiar" data-copy="${pfinal.toFixed(2)}">${formatMoney(pfinal)}</span>
                         </td>
                         <td class="p-2 text-right">
-                          <span class="copy cursor-pointer" title="Copiar" data-copy="${total.toFixed(2)}">${fCur(total)}</span>
+                          <span class="copy cursor-pointer" title="Copiar" data-copy="${total.toFixed(2)}">${formatMoney(total)}</span>
                         </td>
                       </tr>
                       <!-- Fila 2: asociado (gris claro) -->
@@ -188,7 +182,7 @@ export default {
                               <div class="space-y-1">
                                 <div class="text-xs uppercase tracking-wide text-slate-400">Histórico</div>
                                 <div class="flex items-center justify-end gap-2">
-                                  <span class="font-medium">${fCur(referencePrice)}</span>
+                                  <span class="font-medium">${formatMoney(referencePrice)}</span>
                                   ${variationLabel
                                     ? `<span class="text-xs font-semibold ${variationClass}">${variationLabel}</span>`
                                     : ''}
@@ -205,15 +199,15 @@ export default {
                 <tfoot>
                   <tr class="border-t-2 border-slate-300">
                     <td colspan="5" class="text-right p-2">Total (documento):</td>
-                    <td class="p-2 font-medium">${fCur(totalDoc)}</td>
+                    <td class="p-2 font-medium">${formatMoney(totalDoc)}</td>
                   </tr>
                   <tr class="">
                     <td colspan="5" class="text-right p-2 font-bold">Total Calculado:</td>
-                    <td class="p-2 font-bold">${fCur(totalCalc)}</td>
+                    <td class="p-2 font-bold">${formatMoney(totalCalc)}</td>
                   </tr>
                   <tr class="">
                     <td colspan="5" class="text-right p-2 ${diffCls}">Diferencia:</td>
-                    <td class="p-2 ${diffCls}">${fCur(diff)}</td>
+                    <td class="p-2 ${diffCls}">${formatMoney(diff)}</td>
                   </tr>
                 </tfoot>
               </table>

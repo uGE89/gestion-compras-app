@@ -1,4 +1,6 @@
 // apps/mis_pedidos.app.js
+import { formatMoney } from './lib/helpers.js';
+
 export default {
   async mount(container, { appState, auth, db }) {
     // === UI base ===
@@ -66,9 +68,6 @@ export default {
     let openedOrder = null; // { id, ...data }
 
     // === Helpers ===
-    const formatMoney = (n) =>
-      Number(n ?? 0).toLocaleString('es-NI', { style: 'currency', currency: 'NIO', maximumFractionDigits: 2 });
-
     const formatDate = (d) => {
       try {
         return new Date(d).toLocaleDateString('es-ES');
