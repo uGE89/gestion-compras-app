@@ -3,8 +3,8 @@ import {
   collection, doc, getDoc, updateDoc,
   query, where, getDocs, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { ref, uploadBytes, getDownloadURL }
-  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+import { uploadToStorage as uploadToStorageHelper }
+  from '../storage-utils.js';
 import { ItemsEditor } from './components/items_editor.js';
 import { persistMappingsForItems } from './lib/associations.js';
 
@@ -100,11 +100,7 @@ export default {
     }
     function fileToDataURL(file){ return new Promise((res)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.readAsDataURL(file); }); }
     function dataUrlToBlob(dataUrl){ return fetch(dataUrl).then(r=>r.blob()); }
-    async function uploadToStorage(fileOrBlob, path) {
-      const storageRef = ref(storage, path);
-      const snap = await uploadBytes(storageRef, fileOrBlob);
-      return getDownloadURL(snap.ref);
-    }
+    
 
     // ===== Mapeo (asociación por descripción) =====
     async function findAssociation(description) {
@@ -246,7 +242,8 @@ export default {
             const base64 = await fileToDataURL(file);
             appendPreviewImage(preview, base64);
             base64ForAI.push(base64.split(',')[1]);
-            uploadPromises.push(uploadToStorage(file, `invoices/${userId}/${id}/${Date.now()}-${file.name}`));
+            const storagePath = `invoices/${userId}/${id}/${Date.now()}-${file.name}`;
+            uploadPromises.push(uploadToStorageHelper({ storage, path: storagePath, fileOrBlob: file }));
           } else if (file.type === 'application/pdf') {
             aiLoaderText.textContent = `Convirtiendo PDF: ${file.name}...`;
             const imgs = await pdfToImages(file);
@@ -255,7 +252,8 @@ export default {
               appendPreviewImage(preview, base64);
               base64ForAI.push(base64.split(',')[1]);
               const blob = await dataUrlToBlob(base64);
-              uploadPromises.push(uploadToStorage(blob, `invoices/${userId}/${id}/${Date.now()}-${file.name}-page-${i+1}.jpg`));
+              const storagePath = `invoices/${userId}/${id}/${Date.now()}-${file.name}-page-${i+1}.jpg`;
+              uploadPromises.push(uploadToStorageHelper({ storage, path: storagePath, fileOrBlob: blob }));
             }
           }
         }

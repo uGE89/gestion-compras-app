@@ -3,8 +3,8 @@ import {
   collection, addDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { ref, uploadBytes, getDownloadURL }
-  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+import { uploadToStorage as uploadToStorageHelper }
+  from '../storage-utils.js';
 import { ItemsEditor } from './components/items_editor.js';
 const COT_COLLECTION = 'cotizaciones_analizadas';
 import { associateItemsBatch, persistMappingsForItems } from './lib/associations.js';
@@ -59,8 +59,7 @@ export default {
         imgs.push(c.toDataURL('image/jpeg'));} return imgs;}
     const fileToB64 = f => new Promise(r=>{const rd=new FileReader(); rd.onload=e=>r(e.target.result); rd.readAsDataURL(f);});
     const dataUrlToBlob = d => fetch(d).then(r=>r.blob());
-    async function uploadToStorage(fileOrBlob, path){
-      const sref=ref(storage,path); const snap=await uploadBytes(sref,fileOrBlob); return getDownloadURL(snap.ref); }
+    
 
     // === UI
     container.innerHTML = `
@@ -137,7 +136,8 @@ export default {
           if (f.type.startsWith('image/')){
             const b64=await fileToB64(f); base64.push(b64.split(',')[1]);
             appendPrev(prev, b64);
-            uploads.push(uploadToStorage(f, `quotes/${userId}/${rfqId}/${Date.now()}-${f.name}`));
+            const storagePath = `quotes/${userId}/${rfqId}/${Date.now()}-${f.name}`;
+            uploads.push(uploadToStorageHelper({ storage, path: storagePath, fileOrBlob: f }));
           } else if (f.type==='application/pdf'){
             txt.textContent=`Convirtiendo PDF: ${f.name}…`;
             const imgs=await pdfToImgs(f);
@@ -145,7 +145,8 @@ export default {
               appendPrev(prev, imgs[i]);
               base64.push(imgs[i].split(',')[1]);
               const blob=await dataUrlToBlob(imgs[i]);
-              uploads.push(uploadToStorage(blob, `quotes/${userId}/${rfqId}/${Date.now()}-${f.name}-p${i+1}.jpg`));
+              const storagePath = `quotes/${userId}/${rfqId}/${Date.now()}-${f.name}-p${i+1}.jpg`;
+              uploads.push(uploadToStorageHelper({ storage, path: storagePath, fileOrBlob: blob }));
             }
           }
         }
