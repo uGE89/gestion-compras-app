@@ -127,8 +127,8 @@
 
     // Service Worker
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
-        .then(reg => console.log('Service Worker OK:', reg.scope))
+      navigator.serviceWorker
+        .register(new URL('./service-worker.js', import.meta.url), { scope: './' })
         .catch(err => console.error('SW error:', err));
     }
 
