@@ -80,14 +80,12 @@ self.addEventListener('fetch', (event) => {
 
   // 1) No interceptar nada que no sea GET (deja pasar POST: BigQuery, etc.)
   if (req.method !== 'GET') {
-    event.respondWith(fetch(req));
-    return;
+    return; // dejar que el navegador maneje la request normalmente
   }
 
   // 2) No interceptar orígenes externos (CDNs, Google APIs, etc.)
   if (url.origin !== self.location.origin) {
-    event.respondWith(fetch(req));
-    return;
+    return; // no interceptar recursos cross-origin
   }
 
   // 3) BYPASS absoluto para módulos / scripts (evita fallback HTML → error de MIME)
