@@ -5,7 +5,7 @@ import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/f
 import {
   collection, addDoc, serverTimestamp, getDocs, query, where
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+import { uploadToStorage } from '../storage-utils.js';
 
 export default {
   async mount(container) {
@@ -145,7 +145,9 @@ export default {
         imgPrev.src = base64; imgPrev.classList.remove('hidden');
 
         // Subir archivo original a Storage
-        currentImageUrl = await uploadFileToStorage(file);
+        if (!userId) throw new Error('Usuario no autenticado.');
+        const storagePath = `transfer-images/${userId}/${Date.now()}_${file.name}`;
+        currentImageUrl = await uploadToStorage({ storage, path: storagePath, fileOrBlob: file });
 
         // Garantiza caches de Alegra
         if (!alegraContactsCache.length || !alegraCategoriesCache.length) {
@@ -185,13 +187,6 @@ export default {
         aiLoader.classList.add('hidden');
         imagePanel.style.pointerEvents = 'auto';
       }
-    }
-
-    async function uploadFileToStorage(file) {
-      if (!userId) throw new Error('Usuario no autenticado.');
-      const storageRef = ref(storage, `transfer-images/${userId}/${Date.now()}_${file.name}`);
-      const up = await uploadBytes(storageRef, file);
-      return await getDownloadURL(up.ref);
     }
 
     async function renderPdfToImage(file) {

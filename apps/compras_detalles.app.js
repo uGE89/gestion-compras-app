@@ -2,8 +2,8 @@
 import {
   doc, getDoc, updateDoc, arrayUnion, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { ref, uploadBytes, getDownloadURL }
-  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+import { uploadToStorage as uploadToStorageHelper }
+  from '../storage-utils.js';
 
 export default {
   title: 'Detalles de Compra',
@@ -268,9 +268,8 @@ export default {
       // Subir imagen
       root.querySelector('#add-img').addEventListener('change', async (e)=>{
         const file = e.target.files?.[0]; if (!file) return;
-        const storageRef = ref(storage, `invoices/${auth?.currentUser?.uid||'anon'}/${id}/${Date.now()}-${file.name}`);
-        const snap = await uploadBytes(storageRef, file);
-        const url = await getDownloadURL(snap.ref);
+        const storagePath = `invoices/${auth?.currentUser?.uid||'anon'}/${id}/${Date.now()}-${file.name}`;
+        const url = await uploadToStorageHelper({ storage, path: storagePath, fileOrBlob: file });
         const fresh = (await getDoc(doc(db,'compras',id))).data();
         const images = Array.from(new Set([...(fresh.images||[]), url]));
         await updateDoc(doc(db,'compras',id), { images });

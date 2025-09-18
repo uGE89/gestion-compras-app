@@ -138,7 +138,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity
     import { auth, db, storage, firebaseConfig } from './firebase-init.js';
     import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { collection, addDoc, serverTimestamp, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-    import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+    import { uploadToStorage } from './storage-utils.js';
 
     // --- 1. ESTADO Y CONSTANTES GLOBALES ---
     let userId = null, currentImageUrl = null;
@@ -209,7 +209,9 @@ async function handleFileSelect(event) {
     img.classList.remove('hidden');
 
     // Sube archivo
-    currentImageUrl = await uploadFileToStorage(file);
+    if (!userId) throw new Error("Usuario no autenticado.");
+    const storagePath = `transfer-images/${userId}/${Date.now()}_${file.name}`;
+    currentImageUrl = await uploadToStorage({ storage, path: storagePath, fileOrBlob: file });
 
     // Asegura caches antes de pedir a la IA
     if (!alegraContactsCache.length || !alegraCategoriesCache.length) {
@@ -1012,13 +1014,6 @@ Si **NO** es un estado de cuenta con columnas (comprobantes, tickets, vouchers, 
         });
     }
     
-    async function uploadFileToStorage(file) {
-        if (!userId) throw new Error("Usuario no autenticado.");
-        const storageRef = ref(storage, `transfer-images/${userId}/${Date.now()}_${file.name}`);
-        const uploadResult = await uploadBytes(storageRef, file);
-        return await getDownloadURL(uploadResult.ref);
-    }
-
 async function checkConfirmationExists(number) {
   const normalized = normalizeConfirmation(number);
   if (!normalized) return false; // null o vacío no se valida
