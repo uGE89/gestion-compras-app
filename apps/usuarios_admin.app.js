@@ -36,6 +36,7 @@ function humanizeAppId(id){
   return id.replace(/_/g,' ').replace(/\b\w/g, m => m.toUpperCase());
 }
 const APP_CHOICES = Object.keys(APP_REGISTRY)
+  .filter(id => APP_REGISTRY.has(id))
   // opcional: filtra internas si tienes alguna convención
   .filter(k => !k.startsWith('_'))
   .map(id => ({ id, label: humanizeAppId(id) }));
@@ -397,7 +398,7 @@ export default {
         .filter(cb => cb.checked)
         .map(cb => cb.dataset.appid);
       // sanity check: solo apps válidas del registry
-      allowedApps = allowedApps.filter(id => !!APP_REGISTRY[id]);
+      allowedApps = allowedApps.filter(id => APP_REGISTRY.has(id));
 
       const payload = {
         UsuarioID, Rol, Sucursal, Activo, PIN, Puntos, Insignias,
