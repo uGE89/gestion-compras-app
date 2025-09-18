@@ -14,7 +14,10 @@ export function createRouter({ container, registry, deps = {}, fallbackLoadConte
     const [pathRaw = '', qs] = raw.split('?');
     const cleanPath = pathRaw.replace(/\/+$/, ''); // quita "/" al final
     const params = new URLSearchParams(qs || '');
-    return { path: pathRaw, cleanPath, params };
+    const normalizedPath = cleanPath
+      .replace(/^\/+|\/+$/g, '') // remove leading/trailing slashes
+      .replace(/-/g, '_');
+    return { path: pathRaw, cleanPath, normalizedPath, params };
   }
 
   function getLoader(key) {
@@ -34,12 +37,12 @@ export function createRouter({ container, registry, deps = {}, fallbackLoadConte
   }
 
   async function mount(route) {
-    const { cleanPath, params } = parseRoute(route);
+    const { cleanPath, normalizedPath, params } = parseRoute(route);
 
     await unmount();
     container.innerHTML = '<div class="text-center py-10 text-slate-500">Cargando…</div>';
 
-    const loader = getLoader(cleanPath);
+    const loader = getLoader(normalizedPath || cleanPath);
     if (loader) {
       try {
         const mod = await loader();
