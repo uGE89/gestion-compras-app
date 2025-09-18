@@ -41,7 +41,7 @@
   PrecioU_Ref, PrecioVta_Ref, InvSeg, Tr_meses, BasePack, ModeQty, ...
 }
 UI y Librerías
-Tailwind por CDN, fuente Inter, Material Icons.
+Tailwind se carga directamente por CDN con `<script src="https://cdn.tailwindcss.com"></script>` en `index.html` y los HTML legacy, sin loader adicional. También se incluye la fuente Inter y los iconos de Material Icons por CDN.
 
 Chart.js + chartjs-plugin-datalabels por CDN global (no imports ESM).
 
