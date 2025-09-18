@@ -1,6 +1,6 @@
 // service-worker.js
 // ⇨ Sube este número en cada deploy para invalidar caché viejo.
-const APP_VERSION = '2025.09.1.151';
+const APP_VERSION = '2025.09.1.152';
 const PREFIX     = 'gestion-compras-cache-';
 const CACHE_NAME = `${PREFIX}${APP_VERSION}`;
 
@@ -11,9 +11,7 @@ const URLS_TO_CACHE = [
   '/login.html',
   '/fallback.html',
   '/app_extraccion.html',
-  '/app_pedidos_movil.html',
   '/app_historial_transferencias.html',
-  '/analizador_cotizaciones.html',
   '/state.js',
   '/app_loader.js',
   '/firebase-init.js',
@@ -54,9 +52,14 @@ async function cacheFirst(req) {
 
 // -------- Ciclo de vida --------
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(URLS_TO_CACHE))
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await Promise.all(
+      URLS_TO_CACHE.map((url) => cache.add(url).catch((err) => {
+        console.warn('SW install: unable to cache', url, err);
+      }))
+    );
+  })());
   self.skipWaiting(); // activar de una
 });
 
