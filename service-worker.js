@@ -1,6 +1,6 @@
 // service-worker.js
 // ⇨ Sube este número en cada deploy para invalidar caché viejo.
-const APP_VERSION = '2025.09.1.3';
+const APP_VERSION = '2025.09.1.4';
 const PREFIX     = 'gestion-compras-cache-';
 const CACHE_NAME = `${PREFIX}${APP_VERSION}`;
 
