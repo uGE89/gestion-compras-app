@@ -12,7 +12,7 @@ import {
   serverTimestamp,
   writeBatch
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { showToast } from '../apps/lib/toast.js';
+import { showToast } from './lib/toast.js';
 
 // ⛔️ Eliminado TARGET_ACCOUNTS fijo
 
