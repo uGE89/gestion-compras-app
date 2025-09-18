@@ -129,7 +129,7 @@
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register(new URL('./service-worker.js', import.meta.url), { scope: './' })
-        .catch(err => console.error('SW error:', err));
+        .catch(() => {});
     }
 
     const appShell = document.getElementById('app-shell');
