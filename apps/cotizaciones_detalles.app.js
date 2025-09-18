@@ -32,6 +32,14 @@ export default {
     root.className = 'max-w-6xl mx-auto p-4 md:p-6';
     container.innerHTML = ''; container.appendChild(root);
 
+    const productCatalog = appState?.productCatalog || [];
+
+    const normalizeId = (value) => {
+      const str = String(value ?? '');
+      const trimmed = str.replace(/^0+/, '');
+      return trimmed || str;
+    };
+
     async function load() {
       const snap = await getDoc(doc(db, COT_COLLECTION, id));
       if (!snap.exists()) { root.innerHTML = '<div class="p-6 text-red-500">No existe la cotización.</div>'; return; }
@@ -94,6 +102,59 @@ export default {
                     const claveCat  = it.clave_catalogo || '';
                     const descCat   = it.desc_catalogo || '';
 
+                    let referencePrice = null;
+                    let variationPct = null;
+
+                    if (claveCat) {
+                      const normalizedClave = normalizeId(claveCat);
+                      const product = productCatalog.find(p => normalizeId(p.id) === normalizedClave);
+
+                      if (product) {
+                        const directRef = Number(product?.PrecioU_Ref ?? product?.stats?.PrecioU_Ref ?? 0);
+                        if (!Number.isNaN(directRef) && directRef > 0) {
+                          referencePrice = directRef;
+                        } else {
+                          const recientes = Array.isArray(product?.stats?.preciosCompraRecientes)
+                            ? product.stats.preciosCompraRecientes
+                            : [];
+
+                          for (const entry of recientes) {
+                            if (!entry) continue;
+                            const raw =
+                              entry?.PrecioCom ??
+                              entry?.['Precio Com'] ??
+                              entry?.Precio ??
+                              entry?.precio ??
+                              entry?.precioCompra ??
+                              entry?.precio_unitario ??
+                              entry?.PrecioU ??
+                              entry?.PrecioUnitario;
+                            const parsed = Number(raw);
+                            if (!Number.isNaN(parsed) && parsed > 0) {
+                              referencePrice = parsed;
+                              break;
+                            }
+                          }
+                        }
+
+                        if (referencePrice != null && referencePrice > 0) {
+                          const rawDiff = ((pfinal - referencePrice) / referencePrice) * 100;
+                          if (Number.isFinite(rawDiff)) variationPct = rawDiff;
+                        }
+                      }
+                    }
+
+                    const variationClass =
+                      variationPct == null || Math.abs(variationPct) < 0.01
+                        ? 'text-slate-500'
+                        : variationPct > 0
+                          ? 'text-red-600'
+                          : 'text-emerald-600';
+                    const variationLabel =
+                      variationPct == null
+                        ? ''
+                        : `${variationPct > 0 ? '+' : ''}${variationPct.toFixed(1)}%`;
+
                     return `
                       <!-- Fila 1: extracción (blanco) -->
                       <tr class="border-b border-slate-100 bg-white">
@@ -120,7 +181,22 @@ export default {
                             — ${descCat ? `<span>${descCat}</span>` : '<span class="text-slate-400">Sin descripción de catálogo</span>'}
                           ` : '<span class="text-slate-400">Sin asociación</span>'}
                         </td>
-                        <td class="p-2 text-right text-slate-600" colspan="3"></td>
+                        <td class="p-2 text-right text-slate-500" colspan="2"></td>
+                        <td class="p-2 text-right text-slate-600">
+                          ${referencePrice != null
+                            ? `
+                              <div class="space-y-1">
+                                <div class="text-xs uppercase tracking-wide text-slate-400">Histórico</div>
+                                <div class="flex items-center justify-end gap-2">
+                                  <span class="font-medium">${fCur(referencePrice)}</span>
+                                  ${variationLabel
+                                    ? `<span class="text-xs font-semibold ${variationClass}">${variationLabel}</span>`
+                                    : ''}
+                                </div>
+                              </div>
+                            `
+                            : '<span class="text-slate-400 italic">Sin dato</span>'}
+                        </td>
                         <td class="p-2 text-right text-slate-600"></td>
                       </tr>
                     `;
