@@ -4,9 +4,9 @@
 
 ## Arquitectura
 - Frontend **sin bundler**, módulos ES en `/public`.
-- Router por **hash** con `router-lite` + `registry.js`.
+- Router por **hash** con `router-lite` + `framework/registry.js`.
   - Navegación: `#/ruta?param=valor` (ej.: `#/detalles?id=160MC03`).
-  - `registry.js` mapea rutas → `() => import('apps/xxx.app.js')`.
+  - `framework/registry.js` mapea rutas → `() => import('apps/xxx.app.js')`.
   - El router pasa `params: URLSearchParams` a `mount()` de cada app.
 - Soporte para HTMLs legacy vía `app_loader.js` (fallback).
 
@@ -110,7 +110,7 @@ Plantilla de Prompt (detallada)
 diff
 Copiar código
 [Contexto]
-- Router hash + registry.js; apps en /public/apps/*.app.js (export default { mount, unmount }).
+- Router hash + `framework/registry.js`; apps en /public/apps/*.app.js (export default { mount, unmount }).
 - Librerías por CDN: Tailwind, Inter, Material Icons, Chart.js + DataLabels.
 - Datos: appState (productCatalog, allProveedores, isCatalogReady) listo en index (BigQuery→IndexedDB).
 - Hosting: Firebase Hosting; SW con CACHE_NAME=<...>.
