@@ -1,6 +1,6 @@
 // apps/compras_detalles.app.js
 import {
-  doc, getDoc, updateDoc, arrayUnion, serverTimestamp
+  doc, getDoc, updateDoc, arrayUnion, Timestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { uploadToStorage as uploadToStorageHelper }
   from '../storage-utils.js';
@@ -260,7 +260,7 @@ export default {
         const txt = root.querySelector('#comment-txt').value.trim();
         if (!txt) return;
         await updateDoc(doc(db,'compras',id), {
-          comments: arrayUnion({ text: txt, authorId: auth?.currentUser?.uid||'anon', createdAt: serverTimestamp() })
+          comments: arrayUnion({ text: txt, authorId: auth?.currentUser?.uid||'anon', createdAt: Timestamp.now() })
         });
         await load(); // recargar
       });
