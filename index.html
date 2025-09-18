@@ -346,9 +346,11 @@
     function computeFirstAllowedApp(){
       if (ALLOWED_APPS_SET.has('*')) {
         const candidates = Array.from(document.querySelectorAll('#nav-menu a[data-app]')).map(a => a.getAttribute('data-app'));
-        return candidates.find(a => !!registry[a]) || Object.keys(registry)[0];
+        return candidates.find(a => registry.has(a))
+          || Object.keys(registry).find(key => registry.has(key))
+          || null;
       }
-      return [...ALLOWED_APPS_SET].find(a => !!registry[a]) || null;
+      return [...ALLOWED_APPS_SET].find(a => registry.has(a)) || null;
     }
     function filterNavUI(){
       document.querySelectorAll('a[data-app]').forEach(a => {
