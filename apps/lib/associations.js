@@ -10,7 +10,19 @@ export const slugifyDesc = (s='') =>
    .toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
 
 const normProv  = (s='') => slugifyDesc(s);
-const normCode  = (s='') => String(s).trim().toLowerCase();
+const FIRESTORE_DISALLOWED_SEGMENT_CHARS = /[\/\u0000-\u001f\u007f]/g; // slash + control chars
+const FIRESTORE_RESERVED_IDS = new Set(['__name__']);
+const encodeForbiddenChar = (ch) => `-${ch.codePointAt(0).toString(16).padStart(2,'0')}-`;
+
+const sanitizeFirestoreIdSegment = (segment='') => {
+  let safe = segment.replace(FIRESTORE_DISALLOWED_SEGMENT_CHARS, encodeForbiddenChar);
+  if (FIRESTORE_RESERVED_IDS.has(safe)) {
+    safe = safe.replace(/_/g, '-');
+  }
+  return safe;
+};
+
+const normCode  = (s='') => sanitizeFirestoreIdSegment(String(s).trim().toLowerCase());
 const idProvCode = (prov, code) => `provcode:${normProv(prov)}:${normCode(code)}`;
 const idProvDesc = (prov, desc) => `provdesc:${normProv(prov)}:${slugifyDesc(desc)}`;
 const idDesc     = (desc)        => `desc:${slugifyDesc(desc)}`;
