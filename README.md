@@ -15,8 +15,15 @@ Aplicación web para gestionar procesos de compra utilizando **ES Modules**. Int
    ```
 2. Ejecutar un servidor estático (por ejemplo `npx serve .`) **o** iniciar los emuladores de Firebase:
    ```bash
-   firebase emulators:start
-   ```
+firebase emulators:start
+```
+
+## Autenticación
+
+La inicialización de Firebase Authentication se centraliza en
+[firebase-init.js](firebase-init.js). Anteriormente existía un módulo
+independiente `auth.js`, pero se eliminó al no ser necesario y para evitar
+confusiones con las importaciones de los SDKs oficiales de Firebase.
 
 ## Despliegue
 El despliegue se realiza en **Firebase Hosting**:
