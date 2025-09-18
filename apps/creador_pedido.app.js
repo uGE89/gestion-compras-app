@@ -1,5 +1,6 @@
 // apps/creador_pedido.app.js
 import { SearchBar, Paginator } from '../framework/components.js';
+import { clearPedidoDraft } from '../state.js';
 
 export default {
   async mount(container, { appState, auth, db }) {
@@ -195,6 +196,48 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
         draftToSave[id] = item.quantity;
       });
       localStorage.setItem('draftOrder', JSON.stringify(draftToSave));
+    };
+
+    const applyPedidoDraftFromState = () => {
+      const draft = appState?.pedidoDraft;
+      const items = Array.isArray(draft?.items) ? draft.items : [];
+      if (!items.length) return;
+
+      let hasItems = false;
+      for (const entry of items) {
+        const normalizedId = normalizeId(entry?.id);
+        const quantity = Number(entry?.cantidad ?? entry?.quantity ?? entry?.qty ?? 0);
+        if (!normalizedId || !(quantity > 0)) continue;
+
+        const product = productCatalog.find((p) => normalizeId(p.id) === normalizedId);
+        if (!product) continue;
+
+        currentOrder.set(normalizedId, { product, quantity });
+        hasItems = true;
+      }
+
+      const supplierFromDraft = (() => {
+        if (typeof draft?.proveedor === 'string' && draft.proveedor.trim()) {
+          return draft.proveedor.trim();
+        }
+        const supplierEntry = items.find((it) => typeof it?.proveedor === 'string' && it.proveedor.trim());
+        return supplierEntry ? supplierEntry.proveedor.trim() : '';
+      })();
+
+      if (supplierFromDraft) {
+        const canonicalSupplier =
+          proveedorLookup.get(supplierFromDraft) ||
+          (proveedoresList.includes(supplierFromDraft) ? supplierFromDraft : null);
+        if (canonicalSupplier) {
+          selectedSupplierName = canonicalSupplier;
+        }
+      }
+
+      if (hasItems) {
+        saveDraftOrder();
+      }
+
+      clearPedidoDraft();
     };
 
     // ===== UI base (esqueleto) =====
@@ -686,6 +729,7 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
     };
 
     // ===== Inicialización =====
+    applyPedidoDraftFromState();
     loadDraftOrder();
     populateSupplierFilter();
     setupEventListeners();
