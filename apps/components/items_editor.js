@@ -1,4 +1,6 @@
 // apps/components/items_editor.js
+import { normalizeId } from '../lib/helpers.js';
+
 export function ItemsEditor({
   container,
   productCatalog = [],
@@ -26,12 +28,6 @@ export function ItemsEditor({
   const cur = n => `$${(Number(n)||0).toLocaleString('en-US',{ minimumFractionDigits:2, maximumFractionDigits:2 })}`;
 
   const norm = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-
-  const normalizeId = (value) => {
-    const str = String(value ?? '');
-    const trimmed = str.replace(/^0+/, '');
-    return trimmed || str;
-  };
 
   const escapeHtml = (s='') =>
     s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
