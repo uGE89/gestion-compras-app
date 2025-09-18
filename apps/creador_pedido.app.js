@@ -407,7 +407,7 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
 
       const sugeridoBtn = cantidadSugerida > 0
         ? `<button type="button"
-              class="sugerido-toggle-btn w-full mt-2 px-3 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm"
+              class="sugerido-toggle-btn w-full px-3 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-sm"
               title="Usar sugerido: ${cantidadSugerida}"
               data-product-id="${p.id}" data-quantity="${cantidadSugerida}">
               Sugerido (${cantidadSugerida})
@@ -429,9 +429,23 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
             </span>`).join(' ')
         : `<span class="text-[11px] text-slate-400">Sin desglose</span>`;
 
-      const footer = isOrdered
-        ? `<div class="mt-3 bg-emerald-50 text-emerald-700 text-center font-semibold rounded-2xl px-4 py-3">
-             En pedido: ${orderedItem.quantity}
+      const footerSections = [];
+
+      if (sugeridoBtn) {
+        footerSections.push(sugeridoBtn);
+      }
+
+      if (isOrdered) {
+        footerSections.push(`
+          <div class="bg-emerald-50 text-emerald-700 text-center font-semibold rounded-2xl px-4 py-3">
+            En pedido: ${orderedItem.quantity}
+          </div>
+        `);
+      }
+
+      const footer = footerSections.length
+        ? `<div class="mt-4 flex flex-col gap-2">
+             ${footerSections.join('\n')}
            </div>`
         : '';
 
@@ -453,7 +467,6 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
                       value="${isOrdered ? orderedItem.quantity : ''}"
                       placeholder="${cantidadSugerida > 0 ? cantidadSugerida : '0'}"
                       min="0" data-id="${p.id}">
-                    ${sugeridoBtn}
                   </div>
                 </div>
 
@@ -681,16 +694,19 @@ const uiAlert = (message, { title = 'Aviso', variant = 'warning' } = {}) => {
           const suggested = parseInt(sugeridoToggleBtn.dataset.quantity, 10) || 0;
           const row = sugeridoToggleBtn.closest('tr[data-product-id]');
           const input = row?.querySelector('input.quantity-input');
-          const currentVal = parseInt(input?.value, 10) || 0;
+          const normalizedId = normalizeId(productId);
+          const orderQty = Number(currentOrder.get(normalizedId)?.quantity) || 0;
+          const inputQty = parseInt(input?.value, 10) || 0;
+          const currentQty = orderQty || inputQty;
 
-          if (currentVal === suggested) {
+          if (currentQty > 0) {
             if (input) input.value = '';
             updateOrder(productId, 0);
             sugeridoToggleBtn.title = `Usar sugerido: ${suggested}`;
           } else {
             if (input) input.value = suggested;
             updateOrder(productId, suggested);
-            sugeridoToggleBtn.title = `Borrar sugerido`;
+            sugeridoToggleBtn.title = `Borrar cantidad`;
           }
           return;
         }
