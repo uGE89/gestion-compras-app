@@ -266,7 +266,6 @@ export default {
         }
         return true;
       });
-
       renderHistory(filtered);
     }
 
