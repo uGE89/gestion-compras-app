@@ -37,6 +37,7 @@ export default {
       .hud-pair .lab { color:#93c5fd; font-weight:700; }
       .hud-pair .val { cursor:pointer; padding:2px 6px; border-radius:6px; background:#111827; }
     `;
+    style.textContent += `.hud-fixed{position:fixed;right:12px;bottom:130px;z-index:60}`;
     document.head.appendChild(style);
 
     function flashCopied(msg = 'Copiado') {
@@ -227,17 +228,17 @@ export default {
         </section>
       `;
 
-      // --- HUD nativa (inline, clic en valores = copiar) ---
+      // --- HUD flotante (en <body>) ---
+      document.querySelectorAll('.hud-panel').forEach(el => el.remove()); // evita duplicados en recargas parciales
       const hud = document.createElement('div');
-      hud.className = 'hud-panel hud-inline';
+      hud.className = 'hud-panel hud-fixed';
       hud.innerHTML = `
         <span class="hud-pair"><span class="lab">Clave:</span> <span class="val" data-k="clave">—</span></span>
         <span class="hud-pair"><span class="lab">Desc.:</span>  <span class="val" data-k="desc" style="max-width:36vw;overflow:hidden;text-overflow:ellipsis">—</span></span>
         <span class="hud-pair"><span class="lab">Cant.:</span>  <span class="val" data-k="cant">—</span></span>
         <span class="hud-pair"><span class="lab">P. Final:</span><span class="val" data-k="pfin">—</span></span>
       `;
-      const sectionEl = root.querySelector('section');
-      sectionEl.insertAdjacentElement('afterbegin', hud);
+      document.body.appendChild(hud);
 
       hud.addEventListener('click', (e) => {
         const v = e.target.closest('.val'); if (!v) return;
