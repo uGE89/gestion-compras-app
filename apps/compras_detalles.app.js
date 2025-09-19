@@ -229,8 +229,9 @@ export default {
       `;
 
       // --- HUD flotante (en <body>) ---
-      document.querySelectorAll('.hud-panel').forEach(el => el.remove()); // evita duplicados en recargas parciales
+      document.getElementById('hud-compras-detalle')?.remove(); // evita duplicados entre recargas
       const hud = document.createElement('div');
+      hud.id = 'hud-compras-detalle';            // <<--- id único
       hud.className = 'hud-panel hud-fixed';
       hud.innerHTML = `
         <span class="hud-pair"><span class="lab">Clave:</span> <span class="val" data-k="clave">—</span></span>
@@ -375,7 +376,10 @@ export default {
     }
 
     await load();
-    this._cleanup = () => { try { document.removeEventListener('keydown', onKeyDown); } catch {} };
+    this._cleanup = () => {
+      try { document.removeEventListener('keydown', onKeyDown); } catch {}
+      document.getElementById('hud-compras-detalle')?.remove(); // <<--- elimina el HUD al salir
+    };
   },
   unmount() { try { this._cleanup?.(); } catch {} }
 };
